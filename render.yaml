@@ -19,14 +19,6 @@ services:
           type: redis
           name: tamva-redis
           property: connectionString
-      - key: KAFKA_BOOTSTRAP_SERVERS
-        sync: false   # Paste your Upstash bootstrap URL in Render dashboard
-      - key: KAFKA_SECURITY_PROTOCOL
-        value: SASL_SSL
-      - key: KAFKA_SASL_MECHANISM
-        value: SCRAM-SHA-256
-      - key: KAFKA_SASL_JAAS_CONFIG
-        sync: false   # Paste full JAAS config string in Render dashboard (secret)
       - key: TAMVA_JWT_SECRET
         generateCrypto: true
       - key: PORT
