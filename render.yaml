@@ -20,7 +20,7 @@ services:
           name: tamva-redis
           property: connectionString
       - key: TAMVA_JWT_SECRET
-        generateCrypto: true
+        generateValue: true
       - key: PORT
         value: 8080
 
