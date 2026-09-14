@@ -89,32 +89,64 @@ public class DataSeederService implements CommandLineRunner {
         customerRepository.saveAll(List.of(kwame, abena));
 
         // 5. Connections & Consents
-        connectionRepository.save(new Connection() {{ setCustomer(kwame); setInstitution(mtn); setStatus("ACTIVE"); setProviderRef("MOMO_233244123456"); }});
-        connectionRepository.save(new Connection() {{ setCustomer(kwame); setInstitution(gcb); setStatus("ACTIVE"); setProviderRef("GCB_ACC_987654321"); }});
-        connectionRepository.save(new Connection() {{ setCustomer(abena); setInstitution(telecel); setStatus("ACTIVE"); setProviderRef("TC_233555987654"); }});
+        Connection kwameMtnConnection = new Connection();
+        kwameMtnConnection.setCustomer(kwame);
+        kwameMtnConnection.setInstitution(mtn);
+        kwameMtnConnection.setStatus("ACTIVE");
+        kwameMtnConnection.setProviderRef("MOMO_233244123456");
+        connectionRepository.save(kwameMtnConnection);
 
-        consentRepository.save(new Consent() {{
-            setCustomer(kwame);
-            setInstitution(gcb);
-            setPurpose("CREDIT_ASSESSMENT");
-            setScopes("[\"INCOME\", \"CASH_FLOW\", \"DEBT\"]");
-            setStatus("ACTIVE");
-            setGrantedAt(Instant.now().minus(30, ChronoUnit.DAYS));
-            setExpiresAt(Instant.now().plus(60, ChronoUnit.DAYS));
-        }});
+        Connection kwameGcbConnection = new Connection();
+        kwameGcbConnection.setCustomer(kwame);
+        kwameGcbConnection.setInstitution(gcb);
+        kwameGcbConnection.setStatus("ACTIVE");
+        kwameGcbConnection.setProviderRef("GCB_ACC_987654321");
+        connectionRepository.save(kwameGcbConnection);
+
+        Connection abenaTelecelConnection = new Connection();
+        abenaTelecelConnection.setCustomer(abena);
+        abenaTelecelConnection.setInstitution(telecel);
+        abenaTelecelConnection.setStatus("ACTIVE");
+        abenaTelecelConnection.setProviderRef("TC_233555987654");
+        connectionRepository.save(abenaTelecelConnection);
+
+        Consent kwameConsent = new Consent();
+        kwameConsent.setCustomer(kwame);
+        kwameConsent.setInstitution(gcb);
+        kwameConsent.setPurpose("CREDIT_ASSESSMENT");
+        kwameConsent.setScopes("[\"INCOME\", \"CASH_FLOW\", \"DEBT\"]");
+        kwameConsent.setStatus("ACTIVE");
+        kwameConsent.setGrantedAt(Instant.now().minus(30, ChronoUnit.DAYS));
+        kwameConsent.setExpiresAt(Instant.now().plus(60, ChronoUnit.DAYS));
+        consentRepository.save(kwameConsent);
 
         // 6. Seed Accounts
-        Account kwameMomo = accountRepository.save(new Account() {{
-            setCustomer(kwame); setInstitution(mtn); setAccountType("MOBILE_MONEY"); setCurrency("GHS"); setMaskedIdentifier("024****456"); setAccountRefToken("TOK_KWAME_MOMO");
-        }});
+        Account kwameMomo = new Account();
+        kwameMomo.setCustomer(kwame);
+        kwameMomo.setInstitution(mtn);
+        kwameMomo.setAccountType("MOBILE_MONEY");
+        kwameMomo.setCurrency("GHS");
+        kwameMomo.setMaskedIdentifier("024****456");
+        kwameMomo.setAccountRefToken("TOK_KWAME_MOMO");
+        accountRepository.save(kwameMomo);
 
-        Account kwameBank = accountRepository.save(new Account() {{
-            setCustomer(kwame); setInstitution(gcb); setAccountType("BANK_CURRENT"); setCurrency("GHS"); setMaskedIdentifier("201******321"); setAccountRefToken("TOK_KWAME_GCB");
-        }});
+        Account kwameBank = new Account();
+        kwameBank.setCustomer(kwame);
+        kwameBank.setInstitution(gcb);
+        kwameBank.setAccountType("BANK_CURRENT");
+        kwameBank.setCurrency("GHS");
+        kwameBank.setMaskedIdentifier("201******321");
+        kwameBank.setAccountRefToken("TOK_KWAME_GCB");
+        accountRepository.save(kwameBank);
 
-        Account abenaTelecel = accountRepository.save(new Account() {{
-            setCustomer(abena); setInstitution(telecel); setAccountType("MOBILE_MONEY"); setCurrency("GHS"); setMaskedIdentifier("055****654"); setAccountRefToken("TOK_ABENA_TC");
-        }});
+        Account abenaTelecel = new Account();
+        abenaTelecel.setCustomer(abena);
+        abenaTelecel.setInstitution(telecel);
+        abenaTelecel.setAccountType("MOBILE_MONEY");
+        abenaTelecel.setCurrency("GHS");
+        abenaTelecel.setMaskedIdentifier("055****654");
+        abenaTelecel.setAccountRefToken("TOK_ABENA_TC");
+        accountRepository.save(abenaTelecel);
 
         // 7. Seed Multi-Currency Wallets
         Wallet kwameWallet = walletService.getOrCreateWallet(kwame);
