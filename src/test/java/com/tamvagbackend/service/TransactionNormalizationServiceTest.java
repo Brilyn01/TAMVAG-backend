@@ -67,7 +67,7 @@ class TransactionNormalizationServiceTest {
         assertEquals("GCB PAYROLL", result.getCounterparty());
         assertEquals("salary", result.getMerchantCategory());
         assertEquals("salary payment", result.getReference());
-        assertEquals("gcb", result.getSourceSystem());
+        assertEquals("GCB", result.getSourceSystem());
 
         assertEquals(
                 TransactionNormalizationService.NORMALISATION_VERSION,
@@ -105,6 +105,7 @@ class TransactionNormalizationServiceTest {
                 result.getAmount()
         );
         assertEquals("SERVICE_FEE", result.getMerchantCategory());
+        assertEquals("MTN", result.getSourceSystem());
     }
 
     @Test
@@ -217,7 +218,7 @@ class TransactionNormalizationServiceTest {
         assertEquals("Counterparty", result.getCounterparty());
         assertEquals("Category", result.getMerchantCategory());
         assertEquals("Reference", result.getReference());
-        assertEquals("Provider", result.getSourceSystem());
+        assertEquals("PROVIDER", result.getSourceSystem());
     }
 
     @Test
@@ -377,6 +378,31 @@ class TransactionNormalizationServiceTest {
                 "Provider transaction currency must be a 3-letter ISO code",
                 exception.getMessage()
         );
+    }
+
+    @Test
+    void shouldDefaultMissingSourceSystemToUnknown() {
+        ConnectorProvider.ProviderTransaction providerTransaction =
+                new ConnectorProvider.ProviderTransaction(
+                        "ACC-001",
+                        "evt-unknown-source",
+                        "IN",
+                        new BigDecimal("100.00"),
+                        "GHS",
+                        Instant.parse("2026-09-14T10:00:00Z"),
+                        "BANK_CURRENT",
+                        "EMPLOYER",
+                        null,
+                        "Salary",
+                        null
+                );
+
+        Transaction result = service.normalize(
+                account,
+                providerTransaction
+        );
+
+        assertEquals("UNKNOWN", result.getSourceSystem());
     }
 
     private ConnectorProvider.ProviderTransaction validProviderTransaction() {
