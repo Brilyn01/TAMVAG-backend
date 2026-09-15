@@ -4,6 +4,7 @@ import com.tamvagbackend.domain.entity.Account;
 import com.tamvagbackend.domain.entity.Connection;
 import com.tamvagbackend.domain.entity.Customer;
 import com.tamvagbackend.domain.entity.Institution;
+import com.tamvagbackend.domain.entity.TransactionQuarantine;
 import com.tamvagbackend.domain.repository.AccountRepository;
 import com.tamvagbackend.domain.repository.ConnectionRepository;
 import com.tamvagbackend.dto.AuditDtos.ConnectorSyncRequest;
@@ -13,6 +14,7 @@ import com.tamvagbackend.service.connector.ConnectorProviderRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.server.ResponseStatusException;
@@ -51,6 +53,9 @@ class ConnectorServiceTest {
     @Mock
     private AuditService auditService;
 
+    @Mock
+    private TransactionQuarantineService quarantineService;
+
     private ConnectorService connectorService;
 
     private UUID connectionId;
@@ -69,7 +74,8 @@ class ConnectorServiceTest {
                 consentAuthorizationService,
                 providerRegistry,
                 ledgerService,
-                auditService
+                auditService,
+                quarantineService
         );
 
         connectionId = UUID.randomUUID();
@@ -173,13 +179,20 @@ class ConnectorServiceTest {
                 argThat(providerTransaction ->
                         "GCB-PILOT-001".equals(providerTransaction.sourceEventId())
                                 && "IN".equals(providerTransaction.direction())
-                                && new BigDecimal("2500.00").compareTo(providerTransaction.amount()) == 0
+                                && new BigDecimal("2500.00")
+                                .compareTo(providerTransaction.amount()) == 0
                                 && "GHS".equals(providerTransaction.currency())
                                 && "BANK_CURRENT".equals(providerTransaction.channel())
                                 && "GCB PILOT PAYROLL".equals(providerTransaction.counterparty())
                                 && "SALARY".equals(providerTransaction.reference())
                                 && "GCB".equals(providerTransaction.sourceSystem())
                 )
+        );
+
+        verify(quarantineService, never()).quarantine(
+                any(Connection.class),
+                any(ConnectorProvider.ProviderTransaction.class),
+                anyString()
         );
 
         verify(connectionRepository).save(connection);
@@ -218,6 +231,16 @@ class ConnectorServiceTest {
                         "GCB"
                 );
 
+        TransactionQuarantine quarantineRecord = new TransactionQuarantine();
+        quarantineRecord.setQuarantineId(UUID.randomUUID());
+        quarantineRecord.setConnection(connection);
+        quarantineRecord.setSourceEventId("");
+        quarantineRecord.setSourceSystem("GCB");
+        quarantineRecord.setAccountRefToken("GCB_ACC_987654321");
+        quarantineRecord.setReason("Provider source event ID is required");
+        quarantineRecord.setStatus("OPEN");
+        quarantineRecord.setCreatedAt(Instant.now());
+
         when(connectionRepository
                 .findByConnectionIdAndCustomerIdAndInstitutionId(
                         connectionId,
@@ -239,6 +262,13 @@ class ConnectorServiceTest {
         ))
                 .thenReturn(null);
 
+        when(quarantineService.quarantine(
+                eq(connection),
+                eq(invalidTransaction),
+                eq("Provider source event ID is required")
+        ))
+                .thenReturn(quarantineRecord);
+
         when(connectionRepository.save(any(Connection.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -249,15 +279,25 @@ class ConnectorServiceTest {
                         institutionId
                 );
 
+        assertNotNull(response);
         assertEquals("COMPLETED", response.status());
         assertEquals(1, response.recordsIngested());
         assertEquals(0, response.recordsNormalized());
         assertEquals(1, response.recordsQuarantined());
 
+        verify(quarantineService).quarantine(
+                eq(connection),
+                eq(invalidTransaction),
+                eq("Provider source event ID is required")
+        );
+
         verify(ledgerService, never()).recordProviderTransaction(
                 any(Account.class),
                 any(ConnectorProvider.ProviderTransaction.class)
         );
+
+        verify(accountRepository, never())
+                .findByAccountRefToken(anyString());
     }
 
     @Test
@@ -280,8 +320,10 @@ class ConnectorServiceTest {
         );
 
         assertEquals(403, exception.getStatusCode().value());
+
         verifyNoInteractions(providerRegistry);
         verifyNoInteractions(ledgerService);
+        verifyNoInteractions(quarantineService);
     }
 
     @Test
@@ -310,7 +352,9 @@ class ConnectorServiceTest {
         );
 
         assertEquals(404, exception.getStatusCode().value());
+
         verifyNoInteractions(providerRegistry);
+        verifyNoInteractions(quarantineService);
     }
 
     @Test
@@ -341,7 +385,9 @@ class ConnectorServiceTest {
         );
 
         assertEquals(403, exception.getStatusCode().value());
+
         verifyNoInteractions(providerRegistry);
+        verifyNoInteractions(quarantineService);
     }
 
     @Test
@@ -377,7 +423,9 @@ class ConnectorServiceTest {
         );
 
         assertEquals(400, exception.getStatusCode().value());
+
         verifyNoInteractions(providerRegistry);
+        verifyNoInteractions(quarantineService);
     }
 
     @Test
@@ -418,6 +466,8 @@ class ConnectorServiceTest {
         );
 
         assertEquals(501, exception.getStatusCode().value());
+
+        verifyNoInteractions(quarantineService);
     }
 
     @Test
@@ -469,5 +519,7 @@ class ConnectorServiceTest {
                         "INCREMENTAL".equals(context.syncMode())
                 )
         );
+
+        verifyNoInteractions(quarantineService);
     }
 }
