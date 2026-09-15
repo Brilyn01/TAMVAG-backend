@@ -88,7 +88,7 @@ public class DataSeederService implements CommandLineRunner {
         );
         partnerApp.setName("GCB Digital Risk & Credit Hub");
         partnerApp.setStatus("ACTIVE");
-        partnerApp.setScopes("[\"risk:evaluate\", \"profile:read\", \"consent:create\"]");
+        partnerApp.setScopes("[\"risk:evaluate\", \"profile:read\", \"consent:create\", \"connector:sync\"]");
         applicationRepository.save(partnerApp);
 
         // 3. Seed Exchange Rates Matrix (GHS base against NGN, KES, ZAR, EGP, USD, GBP, EUR)
