@@ -26,6 +26,7 @@ public class ConnectorService {
     private final ConnectorProviderRegistry providerRegistry;
     private final LedgerService ledgerService;
     private final AuditService auditService;
+    private final TransactionQuarantineService quarantineService;
 
     public ConnectorService(
             ConnectionRepository connectionRepository,
@@ -33,7 +34,8 @@ public class ConnectorService {
             ConsentAuthorizationService consentAuthorizationService,
             ConnectorProviderRegistry providerRegistry,
             LedgerService ledgerService,
-            AuditService auditService
+            AuditService auditService,
+            TransactionQuarantineService quarantineService
     ) {
         this.connectionRepository = connectionRepository;
         this.accountRepository = accountRepository;
@@ -41,6 +43,7 @@ public class ConnectorService {
         this.providerRegistry = providerRegistry;
         this.ledgerService = ledgerService;
         this.auditService = auditService;
+        this.quarantineService = quarantineService;
     }
 
     @Transactional
@@ -99,7 +102,7 @@ public class ConnectorService {
         }
 
         String providerCode = resolveProviderCode(
-            connection.getInstitution().getName()
+                connection.getInstitution().getName()
         );
 
         ConnectorProvider provider;
@@ -134,22 +137,71 @@ public class ConnectorService {
         for (ConnectorProvider.ProviderTransaction providerTransaction
                 : providerTransactions) {
 
-            if (!isValid(providerTransaction)) {
+            /*
+             * Validate the provider record first.
+             *
+             * Invalid provider data is quarantined and does not prevent
+             * subsequent provider records from being processed.
+             */
+            String validationError = validate(providerTransaction);
+
+            if (validationError != null) {
+                quarantineService.quarantine(
+                        connection,
+                        providerTransaction,
+                        validationError
+                );
+
                 recordsQuarantined++;
                 continue;
             }
 
-            Account account = resolveAccount(
-                    providerTransaction.accountRefToken(),
-                    connection
-            );
+            /*
+             * Account mapping is also record-level ingestion validation.
+             *
+             * An unmapped or incorrectly owned account must not abort the
+             * entire connector sync. Instead, quarantine that provider
+             * record and continue with the remaining records.
+             */
+            try {
+                Account account = resolveAccount(
+                        providerTransaction.accountRefToken(),
+                        connection
+                );
 
-            ledgerService.recordProviderTransaction(account, providerTransaction);
+                ledgerService.recordProviderTransaction(
+                        account,
+                        providerTransaction
+                );
 
-            recordsNormalized++;
+                recordsNormalized++;
+
+            } catch (ResponseStatusException ex) {
+
+                String quarantineReason;
+
+                if (ex.getStatusCode() == HttpStatus.UNPROCESSABLE_ENTITY) {
+                    quarantineReason =
+                            "Provider account could not be mapped to a TAMVA account";
+                } else if (ex.getStatusCode() == HttpStatus.FORBIDDEN) {
+                    quarantineReason =
+                            "Provider account does not belong to the connector customer and institution";
+                } else {
+                    throw ex;
+                }
+
+                quarantineService.quarantine(
+                        connection,
+                        providerTransaction,
+                        quarantineReason
+                );
+
+                recordsQuarantined++;
+            }
         }
 
         Instant syncedAt = Instant.now();
+
         connection.setLastSyncAt(syncedAt);
         connectionRepository.save(connection);
 
@@ -184,17 +236,51 @@ public class ConnectorService {
         );
     }
 
-    private boolean isValid(
+    private String validate(
             ConnectorProvider.ProviderTransaction transaction
     ) {
-        return transaction != null
-                && transaction.accountRefToken() != null
-                && !transaction.accountRefToken().isBlank()
-                && transaction.sourceEventId() != null
-                && !transaction.sourceEventId().isBlank()
-                && transaction.direction() != null
-                && transaction.amount() != null
-                && transaction.amount().signum() >= 0;
+        if (transaction == null) {
+            return "Provider transaction is null";
+        }
+
+        if (transaction.accountRefToken() == null
+                || transaction.accountRefToken().isBlank()) {
+            return "Provider account reference is required";
+        }
+
+        if (transaction.sourceEventId() == null
+                || transaction.sourceEventId().isBlank()) {
+            return "Provider source event ID is required";
+        }
+
+        if (transaction.direction() == null
+                || transaction.direction().isBlank()) {
+            return "Provider transaction direction is required";
+        }
+
+        if (!"IN".equalsIgnoreCase(transaction.direction())
+                && !"OUT".equalsIgnoreCase(transaction.direction())) {
+            return "Provider transaction direction must be IN or OUT";
+        }
+
+        if (transaction.amount() == null) {
+            return "Provider transaction amount is required";
+        }
+
+        if (transaction.amount().signum() < 0) {
+            return "Provider transaction amount cannot be negative";
+        }
+
+        if (transaction.currency() == null
+                || transaction.currency().isBlank()) {
+            return "Provider transaction currency is required";
+        }
+
+        if (transaction.currency().trim().length() != 3) {
+            return "Provider transaction currency must be a 3-letter ISO code";
+        }
+
+        return null;
     }
 
     private Account resolveAccount(
