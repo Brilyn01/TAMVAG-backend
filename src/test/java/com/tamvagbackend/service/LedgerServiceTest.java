@@ -133,8 +133,9 @@ class LedgerServiceTest {
         when(normalizationService.normalize(account, providerTransaction))
                 .thenReturn(normalizedTransaction);
 
-        when(transactionRepository.findByAccountAndSourceEventId(
+        when(transactionRepository.findByAccountAndSourceSystemAndSourceEventId(
                 account,
+                "GCB",
                 "GCB-PILOT-001"
         )).thenReturn(Optional.empty());
 
@@ -226,8 +227,9 @@ class LedgerServiceTest {
         when(normalizationService.normalize(account, providerTransaction))
                 .thenReturn(normalizedTransaction);
 
-        when(transactionRepository.findByAccountAndSourceEventId(
+        when(transactionRepository.findByAccountAndSourceSystemAndSourceEventId(
                 account,
+                "GCB",
                 "GCB-IN-001"
         )).thenReturn(Optional.empty());
 
@@ -294,8 +296,9 @@ class LedgerServiceTest {
         when(normalizationService.normalize(account, providerTransaction))
                 .thenReturn(normalizedTransaction);
 
-        when(transactionRepository.findByAccountAndSourceEventId(
+        when(transactionRepository.findByAccountAndSourceSystemAndSourceEventId(
                 account,
+                "GCB",
                 "GCB-OUT-001"
         )).thenReturn(Optional.empty());
 
@@ -359,8 +362,9 @@ class LedgerServiceTest {
         when(normalizationService.normalize(account, providerTransaction))
                 .thenReturn(existingTransaction);
 
-        when(transactionRepository.findByAccountAndSourceEventId(
+        when(transactionRepository.findByAccountAndSourceSystemAndSourceEventId(
                 account,
+                "GCB",
                 "GCB-DUP-001"
         )).thenReturn(Optional.of(existingTransaction));
 
@@ -462,8 +466,9 @@ class LedgerServiceTest {
         when(normalizationService.normalize(account, providerTransaction))
                 .thenReturn(normalizedTransaction);
 
-        when(transactionRepository.findByAccountAndSourceEventId(
+        when(transactionRepository.findByAccountAndSourceSystemAndSourceEventId(
                 account,
+                "MTN",
                 "GCB-COMPLETE-001"
         )).thenReturn(Optional.empty());
 
@@ -482,6 +487,112 @@ class LedgerServiceTest {
                 account,
                 providerTransaction
         );
+    }
+
+    @Test
+    void recordProviderTransactionShouldTreatSameProviderAndEventAsDuplicate() {
+        ConnectorProvider.ProviderTransaction providerTransaction =
+                new ConnectorProvider.ProviderTransaction(
+                        "GCB_ACC_987654321",
+                        "EVENT-001",
+                        "IN",
+                        new BigDecimal("500.00"),
+                        "GHS",
+                        Instant.now(),
+                        "BANK_CURRENT",
+                        "GCB",
+                        "SALARY",
+                        "Salary",
+                        "GCB"
+                );
+
+        Transaction existingTransaction = buildTransaction(
+                "EVENT-001",
+                "IN",
+                new BigDecimal("500.00"),
+                "GHS",
+                "SALARY",
+                "Salary",
+                "GCB"
+        );
+
+        existingTransaction.setStatus("COMPLETED");
+
+        when(normalizationService.normalize(account, providerTransaction))
+                .thenReturn(existingTransaction);
+
+        when(transactionRepository.findByAccountAndSourceSystemAndSourceEventId(
+                account,
+                "GCB",
+                "EVENT-001"
+        )).thenReturn(Optional.of(existingTransaction));
+
+        Transaction result =
+                ledgerService.recordProviderTransaction(
+                        account,
+                        providerTransaction
+                );
+
+        assertSame(existingTransaction, result);
+
+        verify(transactionRepository, never()).save(any(Transaction.class));
+        verify(ledgerEntryRepository, never()).save(any(LedgerEntry.class));
+    }
+
+    @Test
+    void recordProviderTransactionShouldAllowSameEventIdFromDifferentProviders() {
+        ConnectorProvider.ProviderTransaction gcbTransaction =
+                new ConnectorProvider.ProviderTransaction(
+                        "GCB_ACC_987654321",
+                        "EVENT-001",
+                        "IN",
+                        new BigDecimal("500.00"),
+                        "GHS",
+                        Instant.now(),
+                        "BANK_CURRENT",
+                        "GCB",
+                        "SALARY",
+                        "GCB Salary",
+                        "GCB"
+                );
+
+        Transaction normalizedTransaction = buildTransaction(
+                "EVENT-001",
+                "IN",
+                new BigDecimal("500.00"),
+                "GHS",
+                "SALARY",
+                "GCB Salary",
+                "GCB"
+        );
+
+        normalizedTransaction.setStatus("NORMALISED");
+
+        when(normalizationService.normalize(account, gcbTransaction))
+                .thenReturn(normalizedTransaction);
+
+        when(transactionRepository.findByAccountAndSourceSystemAndSourceEventId(
+                account,
+                "GCB",
+                "EVENT-001"
+        )).thenReturn(Optional.empty());
+
+        when(transactionRepository.save(any(Transaction.class)))
+                .thenReturn(normalizedTransaction);
+
+        when(ledgerEntryRepository.save(any(LedgerEntry.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        Transaction result =
+                ledgerService.recordProviderTransaction(
+                        account,
+                        gcbTransaction
+                );
+
+        assertNotNull(result);
+
+        verify(transactionRepository).save(any(Transaction.class));
+        verify(ledgerEntryRepository).save(any(LedgerEntry.class));
     }
 
     private Transaction buildTransaction(
