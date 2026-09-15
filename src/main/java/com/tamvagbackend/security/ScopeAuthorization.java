@@ -12,4 +12,6 @@ public final class ScopeAuthorization {
 
     public static final String APPLICATION_READ = "SCOPE_application:read";
     public static final String APPLICATION_MANAGE = "SCOPE_application:manage";
+
+    public static final String CONNECTOR_SYNC = "SCOPE_connector:sync";
 }
