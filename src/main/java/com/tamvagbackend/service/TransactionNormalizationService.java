@@ -87,9 +87,7 @@ public class TransactionNormalizationService {
                 normalizeOptional(providerTransaction.reference())
         );
 
-        transaction.setSourceSystem(
-                normalizeOptional(providerTransaction.sourceSystem())
-        );
+        transaction.setSourceSystem(normalizeSourceSystem(providerTransaction.sourceSystem()));
 
         transaction.setNormalisationVersion(NORMALISATION_VERSION);
         transaction.setCreatedAt(Instant.now());
@@ -183,5 +181,12 @@ public class TransactionNormalizationService {
         }
 
         return value.trim();
+    }
+
+    private String normalizeSourceSystem(String sourceSystem) {
+        if (sourceSystem == null || sourceSystem.isBlank()) {
+            return "UNKNOWN";
+        }
+        return sourceSystem.trim().toUpperCase(Locale.ROOT);
     }
 }
