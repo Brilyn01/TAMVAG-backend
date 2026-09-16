@@ -82,14 +82,55 @@ springdoc:
     operations-sorter: method
 
 tamva:
-  ruleset-version: rules-2026.09.1
+  risk:
+    ruleset-version: ${TAMVA_RULESET_VERSION:rules-2026.09.1}
+
+    new-device:
+      code: R001
+      score: 30
+      window-hours: 24
+
+    new-beneficiary:
+      code: R002
+      score: 25
+      window-hours: 24
+
+    unusual-amount:
+      code: R003
+      score: 25
+      multiplier: 3.0
+      minimum-amount: 1000.0
+      new-customer-threshold: 5000.0
+      new-customer-score: 20
+
+    velocity:
+      code: R004
+      score: 30
+      transaction-count-threshold: 4
+      window-hours: 1
+
+    account-drain:
+      code: R005
+      score: 20
+      amount-threshold: 8000.0
+      minimum-risk-score: 30
+
+    weak-authentication:
+      code: R006
+      score: 15
+      window-hours: 0
+
+    decision-policy:
+      challenge-threshold: 40
+      hold-threshold: 70
+      block-threshold: 90
   model-version: fraud-v3.2
   default-currency: GHS
   security:
     jwt-secret: ${TAMVA_JWT_SECRET:change-this-development-secret-to-a-long-random-value-2026}
     access-token-ttl-seconds: ${TAMVA_ACCESS_TOKEN_TTL_SECONDS:3600}
   kafka:
-    enabled: false   # Set to true only when a Kafka broker is available
+    enabled: false # Set to true only when a Kafka broker is available
     topics:
       transaction-received: tamva.transaction.received
       transaction-normalised: tamva.transaction.normalised
