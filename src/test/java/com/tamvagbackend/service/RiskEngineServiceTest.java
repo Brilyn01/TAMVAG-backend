@@ -3,7 +3,14 @@ package com.tamvagbackend.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tamvagbackend.domain.entity.Customer;
 import com.tamvagbackend.domain.entity.RiskEvent;
-import com.tamvagbackend.domain.repository.*;
+import com.tamvagbackend.domain.repository.AccountRepository;
+import com.tamvagbackend.service.AuditService;
+import com.tamvagbackend.domain.repository.BeneficiaryRepository;
+import com.tamvagbackend.domain.repository.CaseRecordRepository;
+import com.tamvagbackend.domain.repository.CustomerRepository;
+import com.tamvagbackend.domain.repository.DeviceRepository;
+import com.tamvagbackend.domain.repository.RiskEventRepository;
+import com.tamvagbackend.domain.repository.TransactionRepository;
 import com.tamvagbackend.dto.RiskDtos.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -15,24 +22,48 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.util.*;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class RiskEngineServiceTest {
 
-    @Mock private CustomerRepository customerRepository;
-    @Mock private AccountRepository accountRepository;
-    @Mock private TransactionRepository transactionRepository;
-    @Mock private RiskEventRepository riskEventRepository;
-    @Mock private DeviceRepository deviceRepository;
-    @Mock private BeneficiaryRepository beneficiaryRepository;
-    @Mock private CaseRecordRepository caseRecordRepository;
-    @Mock private AuditService auditService;
-    @Mock private ObjectMapper objectMapper;
+    @Mock
+    private CustomerRepository customerRepository;
+
+    @Mock
+    private AccountRepository accountRepository;
+
+    @Mock
+    private TransactionRepository transactionRepository;
+
+    @Mock
+    private RiskEventRepository riskEventRepository;
+
+    @Mock
+    private DeviceRepository deviceRepository;
+
+    @Mock
+    private BeneficiaryRepository beneficiaryRepository;
+
+    @Mock
+    private CaseRecordRepository caseRecordRepository;
+
+    @Mock
+    private ConfigurableRiskRulesEngine rulesEngine;
+
+    @Mock
+    private AuditService auditService;
+
+    @Mock
+    private ObjectMapper objectMapper;
 
     @InjectMocks
     private RiskEngineService riskEngineService;
@@ -43,45 +74,170 @@ class RiskEngineServiceTest {
     @BeforeEach
     void setUp() {
         customerId = UUID.randomUUID();
-        testCustomer = new Customer(customerId, "CUS_TEST", "INDIVIDUAL", "ACTIVE");
 
-        ReflectionTestUtils.setField(riskEngineService, "rulesetVersion", "rules-2026.09.1");
-        ReflectionTestUtils.setField(riskEngineService, "modelVersion", "fraud-v3.2");
+        testCustomer = new Customer(
+                customerId,
+                "CUS_TEST",
+                "INDIVIDUAL",
+                "ACTIVE"
+        );
+
+        ReflectionTestUtils.setField(
+                riskEngineService,
+                "modelVersion",
+                "fraud-v3.2"
+        );
     }
 
     @Test
     void testEvaluateTransaction_NewDeviceAndNewBeneficiary() throws Exception {
-        when(customerRepository.findById(customerId)).thenReturn(Optional.of(testCustomer));
-        when(deviceRepository.findByCustomerAndFingerprintToken(eq(testCustomer), anyString())).thenReturn(Optional.empty());
-        when(beneficiaryRepository.findByCustomerAndToken(eq(testCustomer), anyString())).thenReturn(Optional.empty());
-        when(transactionRepository.findRecentByCustomer(eq(customerId), any(Instant.class))).thenReturn(Collections.emptyList());
-        when(objectMapper.writeValueAsString(any())).thenReturn("[\"NEW_DEVICE\",\"NEW_BENEFICIARY\"]");
+        when(customerRepository.findById(customerId))
+                .thenReturn(Optional.of(testCustomer));
 
-        when(riskEventRepository.save(any(RiskEvent.class))).thenAnswer(invocation -> {
-            RiskEvent e = invocation.getArgument(0);
-            e.setRiskEventId(UUID.randomUUID());
-            return e;
-        });
+        ConfigurableRiskRulesEngine.RuleEvaluation ruleEvaluation =
+                new ConfigurableRiskRulesEngine.RuleEvaluation(
+                        75,
+                        List.of(
+                                new ReasonDetail(
+                                        "R001",
+                                        "New or unrecognised device used within configured window",
+                                        "MEDIUM"
+                                ),
+                                new ReasonDetail(
+                                        "R002",
+                                        "First-time transfer destination within configured window",
+                                        "MEDIUM"
+                                ),
+                                new ReasonDetail(
+                                        "R003",
+                                        "Large transaction amount for new customer profile",
+                                        "HIGH"
+                                )
+                        ),
+                        List.of(
+                                "NEW_DEVICE",
+                                "NEW_BENEFICIARY",
+                                "UNUSUAL_AMOUNT"
+                        )
+                );
+
+        when(rulesEngine.evaluate(
+                eq(testCustomer),
+                eq("dev_fingerprint_999"),
+                eq("0240001122"),
+                eq(new BigDecimal("8500.00")),
+                any(),
+                any(Instant.class)
+        )).thenReturn(ruleEvaluation);
+
+        when(rulesEngine.evaluateDecision(75))
+                .thenReturn(
+                        new ConfigurableRiskRulesEngine.Decision(
+                                "HOLD",
+                                "STEP_UP_AUTHENTICATION"
+                        )
+                );
+
+        when(rulesEngine.getRulesetVersion())
+                .thenReturn("rules-2026.09.1");
+
+        when(objectMapper.writeValueAsString(any()))
+                .thenReturn(
+                        "[\"NEW_DEVICE\",\"NEW_BENEFICIARY\",\"UNUSUAL_AMOUNT\"]"
+                );
+
+        when(riskEventRepository.save(any(RiskEvent.class)))
+                .thenAnswer(invocation -> {
+                    RiskEvent event = invocation.getArgument(0);
+                    event.setRiskEventId(UUID.randomUUID());
+                    return event;
+                });
 
         RiskEvaluationRequest request = new RiskEvaluationRequest(
                 customerId,
                 null,
                 new BigDecimal("8500.00"),
                 "GHS",
-                new DestinationInfo("MOBILE_MONEY", "0240001122", "REF123"),
+                new DestinationInfo(
+                        "MOBILE_MONEY",
+                        "0240001122",
+                        "REF123"
+                ),
                 "dev_fingerprint_999",
                 "MOBILE_APP",
                 Instant.now(),
-                Map.of("authentication_method", "MFA")
+                Map.of(
+                        "authentication_method",
+                        "MFA"
+                )
         );
 
-        RiskEvaluationResponse response = riskEngineService.evaluateTransaction(request);
+        RiskEvaluationResponse response =
+                riskEngineService.evaluateTransaction(request);
 
         assertNotNull(response);
-        assertTrue(response.riskScore() >= 55); // R001(30) + R002(25) + R003(20) = 75
-        assertTrue(List.of("CHALLENGE", "HOLD", "BLOCK").contains(response.decision()));
-        assertTrue(response.reasonCodes().contains("NEW_DEVICE"));
-        assertTrue(response.reasonCodes().contains("NEW_BENEFICIARY"));
-        verify(riskEventRepository, times(1)).save(any(RiskEvent.class));
+
+        assertEquals(75, response.riskScore());
+        assertEquals("HOLD", response.decision());
+        assertEquals(
+                "STEP_UP_AUTHENTICATION",
+                response.recommendedAction()
+        );
+
+        assertTrue(
+                response.reasonCodes().contains("NEW_DEVICE")
+        );
+
+        assertTrue(
+                response.reasonCodes().contains("NEW_BENEFICIARY")
+        );
+
+        assertTrue(
+                response.reasonCodes().contains("UNUSUAL_AMOUNT")
+        );
+
+        assertEquals(
+                "rules-2026.09.1",
+                response.rulesetVersion()
+        );
+
+        assertEquals(
+                "fraud-v3.2",
+                response.modelVersion()
+        );
+
+        assertNotNull(response.riskEventId());
+        assertNotNull(response.expiresAt());
+
+        verify(rulesEngine, times(1)).evaluate(
+                eq(testCustomer),
+                eq("dev_fingerprint_999"),
+                eq("0240001122"),
+                eq(new BigDecimal("8500.00")),
+                any(),
+                any(Instant.class)
+        );
+
+        verify(rulesEngine, times(1))
+                .evaluateDecision(75);
+
+        verify(rulesEngine, times(1))
+                .getRulesetVersion();
+
+        verify(riskEventRepository, times(1))
+                .save(any(RiskEvent.class));
+
+        verify(caseRecordRepository, times(1))
+                .save(any());
+
+        verify(auditService, times(1)).logEvent(
+                eq("SYSTEM"),
+                eq("risk-engine"),
+                eq("RISK_EVALUATED"),
+                eq("RISK_EVENT"),
+                anyString(),
+                anyString(),
+                anyString()
+        );
     }
 }
