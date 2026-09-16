@@ -29,11 +29,9 @@ public class RiskEngineService {
     private final DeviceRepository deviceRepository;
     private final BeneficiaryRepository beneficiaryRepository;
     private final CaseRecordRepository caseRecordRepository;
+    private final ConfigurableRiskRulesEngine rulesEngine;
     private final AuditService auditService;
     private final ObjectMapper objectMapper;
-
-    @Value("${tamva.ruleset-version:rules-2026.09.1}")
-    private String rulesetVersion;
 
     @Value("${tamva.model-version:fraud-v3.2}")
     private String modelVersion;
@@ -46,6 +44,7 @@ public class RiskEngineService {
             DeviceRepository deviceRepository,
             BeneficiaryRepository beneficiaryRepository,
             CaseRecordRepository caseRecordRepository,
+            ConfigurableRiskRulesEngine rulesEngine,
             AuditService auditService,
             ObjectMapper objectMapper
     ) {
@@ -56,6 +55,7 @@ public class RiskEngineService {
         this.deviceRepository = deviceRepository;
         this.beneficiaryRepository = beneficiaryRepository;
         this.caseRecordRepository = caseRecordRepository;
+        this.rulesEngine = rulesEngine;
         this.auditService = auditService;
         this.objectMapper = objectMapper;
     }
@@ -71,98 +71,49 @@ public class RiskEngineService {
         }
 
         Instant now = Instant.now();
-        List<ReasonDetail> reasons = new ArrayList<>();
-        List<String> reasonCodes = new ArrayList<>();
-        int riskScore = 0;
 
-        // Rule R001: NEW_DEVICE
-        if (request.deviceId() != null && !request.deviceId().isBlank()) {
-            Optional<Device> devOpt = deviceRepository.findByCustomerAndFingerprintToken(customer, request.deviceId());
-            if (devOpt.isEmpty() || devOpt.get().getFirstSeenAt().isAfter(now.minus(Duration.ofHours(24)))) {
-                reasons.add(new ReasonDetail("R001", "New or unrecognised device used within 24h window", "MEDIUM"));
-                reasonCodes.add("NEW_DEVICE");
-                riskScore += 30;
+        ConfigurableRiskRulesEngine.RuleEvaluation ruleEvaluation =
+                rulesEngine.evaluate(
+                        customer,
+                        request.deviceId(),
+                        request.destination() != null
+                                ? request.destination().identifier()
+                                : null,
+                        request.amount(),
+                        request.context(),
+                        now
+                );
 
-                if (devOpt.isEmpty()) {
-                    deviceRepository.save(new Device(customer, request.deviceId()));
-                }
+        int riskScore = ruleEvaluation.riskScore();
+
+        List<ReasonDetail> reasons =
+                ruleEvaluation.reasons();
+
+        List<String> reasonCodes =
+                ruleEvaluation.reasonCodes();
+
+        ConfigurableRiskRulesEngine.Decision policyDecision =
+                rulesEngine.evaluateDecision(riskScore);
+
+        String decision = policyDecision.decision();
+        String recommendedAction = policyDecision.recommendedAction();
+
+        String effectiveRulesetVersion =
+            rulesEngine.getRulesetVersion();
+
+            if (riskScore >= 90) {
+                decision = "BLOCK";
+                recommendedAction = "REJECT_TRANSACTION";
+            } else if (riskScore >= 70) {
+                decision = "HOLD";
+                recommendedAction = "STEP_UP_AUTHENTICATION";
+            } else if (riskScore >= 40) {
+                decision = "CHALLENGE";
+                recommendedAction = "STEP_UP_AUTHENTICATION";
+            } else {
+                decision = "ALLOW";
+                recommendedAction = "NONE";
             }
-        }
-
-        // Rule R002: NEW_BENEFICIARY
-        if (request.destination() != null && request.destination().identifier() != null) {
-            String benToken = request.destination().identifier();
-            Optional<Beneficiary> benOpt = beneficiaryRepository.findByCustomerAndToken(customer, benToken);
-            if (benOpt.isEmpty() || benOpt.get().getFirstSeenAt().isAfter(now.minus(Duration.ofHours(24)))) {
-                reasons.add(new ReasonDetail("R002", "First-time transfer destination within short window", "MEDIUM"));
-                reasonCodes.add("NEW_BENEFICIARY");
-                riskScore += 25;
-
-                if (benOpt.isEmpty()) {
-                    beneficiaryRepository.save(new Beneficiary(customer, benToken));
-                }
-            }
-        }
-
-        // Rule R003: UNUSUAL_AMOUNT
-        List<Transaction> recentTxs = transactionRepository.findRecentByCustomer(customer.getCustomerId(), now.minus(Duration.ofDays(90)));
-        if (!recentTxs.isEmpty()) {
-            double avgAmount = recentTxs.stream().mapToDouble(t -> t.getAmount().doubleValue()).average().orElse(500.0);
-            if (request.amount().doubleValue() > (avgAmount * 3.0) && request.amount().doubleValue() > 1000.0) {
-                reasons.add(new ReasonDetail("R003", "Transaction amount materially exceeds customer historical baseline", "HIGH"));
-                reasonCodes.add("UNUSUAL_AMOUNT");
-                riskScore += 25;
-            }
-        } else if (request.amount().doubleValue() > 5000.0) {
-            reasons.add(new ReasonDetail("R003", "Large transaction amount for new customer profile", "HIGH"));
-            reasonCodes.add("UNUSUAL_AMOUNT");
-            riskScore += 20;
-        }
-
-        // Rule R004: VELOCITY_SPIKE
-        long count1h = recentTxs.stream()
-                .filter(t -> t.getOccurredAt().isAfter(now.minus(Duration.ofHours(1))) && "OUT".equalsIgnoreCase(t.getDirection()))
-                .count();
-        if (count1h >= 4) {
-            reasons.add(new ReasonDetail("R004", "Rapid repeated outbound transactions within rolling 1h window", "HIGH"));
-            reasonCodes.add("VELOCITY_SPIKE");
-            riskScore += 30;
-        }
-
-        // Rule R005: ACCOUNT_DRAIN
-        if (request.amount().doubleValue() > 8000.0 && riskScore > 30) {
-            reasons.add(new ReasonDetail("R005", "Large outbound share of available funds to external account", "CRITICAL"));
-            reasonCodes.add("ACCOUNT_DRAIN");
-            riskScore += 20;
-        }
-
-        // Rule R006: LOCATION_SHIFT / Auth strength check
-        if (request.context() != null && "NONE".equalsIgnoreCase((String) request.context().get("authentication_method"))) {
-            reasons.add(new ReasonDetail("R006", "Weak or missing authentication for high value transaction", "MEDIUM"));
-            reasonCodes.add("LOCATION_SHIFT");
-            riskScore += 15;
-        }
-
-        // Cap risk score at 100
-        riskScore = Math.min(100, riskScore);
-
-        // Decision Policy
-        String decision;
-        String recommendedAction;
-
-        if (riskScore >= 90) {
-            decision = "BLOCK";
-            recommendedAction = "REJECT_TRANSACTION";
-        } else if (riskScore >= 70) {
-            decision = "HOLD";
-            recommendedAction = "STEP_UP_AUTHENTICATION";
-        } else if (riskScore >= 40) {
-            decision = "CHALLENGE";
-            recommendedAction = "STEP_UP_AUTHENTICATION";
-        } else {
-            decision = "ALLOW";
-            recommendedAction = "NONE";
-        }
 
         // Persist RiskEvent
         RiskEvent event = new RiskEvent();
@@ -173,7 +124,7 @@ public class RiskEngineService {
         event.setDecision(decision);
         event.setRecommendedAction(recommendedAction);
         event.setReasonCodes(toJson(reasonCodes));
-        event.setRulesetVersion(rulesetVersion);
+        event.setRulesetVersion(effectiveRulesetVersion);
         event.setModelVersion(modelVersion);
         event.setStatus("EVALUATED");
         event.setCreatedAt(now);
@@ -209,7 +160,7 @@ public class RiskEngineService {
                 recommendedAction,
                 reasons,
                 reasonCodes,
-                rulesetVersion,
+                effectiveRulesetVersion,
                 modelVersion,
                 "fs_" + UUID.randomUUID().toString().substring(0, 8),
                 savedEvent.getExpiresAt()
