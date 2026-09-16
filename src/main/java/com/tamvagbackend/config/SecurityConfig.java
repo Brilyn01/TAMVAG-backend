@@ -1,6 +1,7 @@
 package com.tamvagbackend.config;
 
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
+import com.tamvagbackend.exception.SecurityExceptionHandler;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -77,7 +78,8 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(
             HttpSecurity http,
-            JwtAuthenticationConverter jwtAuthenticationConverter
+            JwtAuthenticationConverter jwtAuthenticationConverter,
+            SecurityExceptionHandler securityExceptionHandler
     ) throws Exception {
 
         http
@@ -95,10 +97,17 @@ public class SecurityConfig {
                         ).permitAll()
                         .anyRequest().authenticated()
                 )
+                .exceptionHandling(exceptions -> exceptions
+                        .authenticationEntryPoint(securityExceptionHandler)
+                        .accessDeniedHandler(securityExceptionHandler)
+                )
                 .oauth2ResourceServer(oauth2 ->
-                        oauth2.jwt(jwt ->
-                                jwt.jwtAuthenticationConverter(jwtAuthenticationConverter)
-                        )
+                        oauth2
+                                .authenticationEntryPoint(securityExceptionHandler)
+                                .accessDeniedHandler(securityExceptionHandler)
+                                .jwt(jwt ->
+                                        jwt.jwtAuthenticationConverter(jwtAuthenticationConverter)
+                                )
                 );
 
         return http.build();
