@@ -78,9 +78,13 @@ public class MultiCurrencyWalletService {
 
             // Initialize 8 currency balance accounts
             for (CurrencyMetadata meta : SUPPORTED_CURRENCIES) {
-                BigDecimal initialAmount = meta.code().equals("GHS") ? new BigDecimal("5000.0000") : BigDecimal.ZERO;
-                WalletBalance balance = new WalletBalance(savedWallet, meta.code(), initialAmount);
-                walletBalanceRepository.save(balance);
+                BigDecimal initialAmount = meta.code().equals("GHS")
+                    ? new BigDecimal("5000.0000")
+                    : BigDecimal.ZERO;
+
+                WalletBalance balance =
+                    new WalletBalance(savedWallet, meta.code(), initialAmount);
+
                 savedWallet.getBalances().add(balance);
             }
 
