@@ -9,8 +9,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Service
 public class CaseManagementService {
@@ -18,81 +18,288 @@ public class CaseManagementService {
     private final CaseRecordRepository caseRecordRepository;
     private final AuditService auditService;
 
-    public CaseManagementService(CaseRecordRepository caseRecordRepository, AuditService auditService) {
+    public CaseManagementService(
+            CaseRecordRepository caseRecordRepository,
+            AuditService auditService
+    ) {
         this.caseRecordRepository = caseRecordRepository;
         this.auditService = auditService;
     }
 
     @Transactional(readOnly = true)
-    public List<CaseResponse> getCases(String status, String severity) {
+    public List<CaseResponse> getCases(
+            String status,
+            String severity
+    ) {
         List<CaseRecord> records;
+
         if (status != null && !status.isBlank()) {
-            records = caseRecordRepository.findByStatus(status.toUpperCase());
+            String normalizedStatus = normalize(status);
+            validateStatus(normalizedStatus);
+            records = caseRecordRepository.findByStatus(normalizedStatus);
+
         } else if (severity != null && !severity.isBlank()) {
-            records = caseRecordRepository.findBySeverity(severity.toUpperCase());
+            String normalizedSeverity = normalize(severity);
+            validateSeverity(normalizedSeverity);
+            records = caseRecordRepository.findBySeverity(normalizedSeverity);
+
         } else {
-            records = caseRecordRepository.findTop50ByOrderByCreatedAtDesc();
+            records = caseRecordRepository
+                    .findTop50ByOrderByCreatedAtDesc();
         }
 
-        return records.stream().map(this::toResponse).collect(Collectors.toList());
+        return records.stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public CaseResponse getCase(UUID caseId) {
+        if (caseId == null) {
+            throw new IllegalArgumentException("case_id is required");
+        }
+
+        CaseRecord record = caseRecordRepository
+                .findById(caseId)
+                .orElseThrow(() ->
+                        new IllegalArgumentException(
+                                "Case not found: " + caseId
+                        )
+                );
+
+        return toResponse(record);
     }
 
     @Transactional
-    public CaseResponse updateCase(UUID caseId, CaseActionRequest request) {
-        CaseRecord record = caseRecordRepository.findById(caseId)
-                .orElseThrow(() -> new IllegalArgumentException("Case not found: " + caseId));
-
-        if (request.assignee() != null && !request.assignee().isBlank()) {
-            record.setAssignee(request.assignee());
-        }
-        if (request.notes() != null && !request.notes().isBlank()) {
-            record.setNotes((record.getNotes() != null ? record.getNotes() + "\n" : "") + request.notes());
+    public CaseResponse updateCase(
+            UUID caseId,
+            CaseActionRequest request
+    ) {
+        if (caseId == null) {
+            throw new IllegalArgumentException("case_id is required");
         }
 
-        String action = request.action().toUpperCase();
-        switch (action) {
-            case "RELEASE" -> record.setStatus("RESOLVED");
-            case "BLOCK" -> record.setStatus("ACTIONED");
-            case "ESCALATE" -> record.setStatus("ESCALATED");
-            case "INVESTIGATE" -> record.setStatus("INVESTIGATING");
-            default -> record.setStatus("TRIAGED");
+        if (request == null) {
+            throw new IllegalArgumentException(
+                    "Case action request is required"
+            );
         }
 
-        if (request.disposition() != null && !request.disposition().isBlank()) {
-            record.setDisposition(request.disposition().toUpperCase());
-        }
+        CaseRecord record = caseRecordRepository
+                .findById(caseId)
+                .orElseThrow(() ->
+                        new IllegalArgumentException(
+                                "Case not found: " + caseId
+                        )
+                );
 
+        String action = normalize(request.action());
+
+        String previousStatus = normalize(record.getStatus());
+
+        String newStatus = resolveStatusForAction(action);
+
+        applyAssignee(record, request.assignee());
+        appendNotes(record, action, request.notes());
+        applyDisposition(record, request.disposition());
+
+        record.setStatus(newStatus);
         record.setUpdatedAt(Instant.now());
+
         CaseRecord updated = caseRecordRepository.save(record);
 
         auditService.logEvent(
                 "ANALYST",
-                request.assignee() != null ? request.assignee() : "analyst",
+                resolveAuditActor(request.assignee()),
                 "CASE_ACTION_APPLIED",
                 "CASE_RECORD",
                 caseId.toString(),
                 null,
-                String.format("Action %s applied to case %s. Status: %s, Disposition: %s", action, caseId, updated.getStatus(), updated.getDisposition())
+                buildAuditPayload(
+                        caseId,
+                        action,
+                        previousStatus,
+                        updated.getStatus(),
+                        updated.getDisposition(),
+                        updated.getAssignee()
+                )
         );
 
         return toResponse(updated);
     }
 
-    private CaseResponse toResponse(CaseRecord c) {
+    private String resolveStatusForAction(String action) {
+        return switch (action) {
+            case "CHALLENGE" -> "TRIAGED";
+            case "HOLD" -> "ACTIONED";
+            case "RELEASE" -> "RESOLVED";
+            case "ESCALATE" -> "ESCALATED";
+            case "BLOCK" -> "ACTIONED";
+            case "INVESTIGATE" -> "INVESTIGATING";
+            default -> throw new IllegalArgumentException(
+                    "Unsupported case action: " + action
+            );
+        };
+    }
+
+    private void applyAssignee(
+            CaseRecord record,
+            String requestedAssignee
+    ) {
+        if (requestedAssignee == null) {
+            return;
+        }
+
+        String assignee = requestedAssignee.trim();
+
+        if (!assignee.isBlank()) {
+            record.setAssignee(assignee);
+        }
+    }
+
+    private void appendNotes(
+            CaseRecord record,
+            String action,
+            String requestedNotes
+    ) {
+        if (requestedNotes == null || requestedNotes.isBlank()) {
+            return;
+        }
+
+        String newNotes = requestedNotes.trim();
+        String existingNotes = record.getNotes();
+
+        String actionEntry =
+                "[" + Instant.now() + "] "
+                        + action
+                        + ": "
+                        + newNotes;
+
+        if (existingNotes == null || existingNotes.isBlank()) {
+            record.setNotes(actionEntry);
+        } else {
+            record.setNotes(
+                    existingNotes.trim()
+                            + "\n"
+                            + actionEntry
+            );
+        }
+    }
+
+    private void applyDisposition(
+            CaseRecord record,
+            String requestedDisposition
+    ) {
+        if (requestedDisposition == null
+                || requestedDisposition.isBlank()) {
+            return;
+        }
+
+        record.setDisposition(
+                normalize(requestedDisposition)
+        );
+    }
+
+    private String resolveAuditActor(String assignee) {
+        if (assignee == null || assignee.isBlank()) {
+            return "analyst";
+        }
+
+        return assignee.trim();
+    }
+
+    private String buildAuditPayload(
+            UUID caseId,
+            String action,
+            String previousStatus,
+            String newStatus,
+            String disposition,
+            String assignee
+    ) {
+        return String.format(
+                "Case %s: action=%s, status=%s->%s, disposition=%s, assignee=%s",
+                caseId,
+                action,
+                previousStatus,
+                newStatus,
+                disposition,
+                assignee
+        );
+    }
+
+    private void validateStatus(String status) {
+        switch (status) {
+            case "OPEN",
+                 "TRIAGED",
+                 "INVESTIGATING",
+                 "ACTIONED",
+                 "RESOLVED",
+                 "ESCALATED" -> {
+            }
+            default -> throw new IllegalArgumentException(
+                    "Unsupported case status: " + status
+            );
+        }
+    }
+
+    private void validateSeverity(String severity) {
+        switch (severity) {
+            case "LOW",
+                 "MEDIUM",
+                 "HIGH",
+                 "CRITICAL" -> {
+            }
+            default -> throw new IllegalArgumentException(
+                    "Unsupported case severity: " + severity
+            );
+        }
+    }
+
+    private String normalize(String value) {
+        if (value == null) {
+            return null;
+        }
+
+        return value.trim()
+                .toUpperCase(Locale.ROOT);
+    }
+
+    private CaseResponse toResponse(CaseRecord record) {
+        if (record == null) {
+            throw new IllegalArgumentException(
+                    "Case record cannot be null"
+            );
+        }
+
+        if (record.getRiskEvent() == null) {
+            throw new IllegalStateException(
+                    "Case " + record.getCaseId()
+                            + " has no associated risk event"
+            );
+        }
+
+        if (record.getRiskEvent().getCustomer() == null) {
+            throw new IllegalStateException(
+                    "Risk event "
+                            + record.getRiskEvent().getRiskEventId()
+                            + " has no associated customer"
+            );
+        }
+
         return new CaseResponse(
-                c.getCaseId(),
-                c.getRiskEvent().getRiskEventId(),
-                c.getRiskEvent().getCustomer().getCustomerId(),
-                c.getRiskEvent().getRiskScore(),
-                c.getRiskEvent().getDecision(),
-                c.getSeverity(),
-                c.getStatus(),
-                c.getSource(),
-                c.getAssignee(),
-                c.getDisposition(),
-                c.getNotes(),
-                c.getCreatedAt(),
-                c.getUpdatedAt()
+                record.getCaseId(),
+                record.getRiskEvent().getRiskEventId(),
+                record.getRiskEvent().getCustomer().getCustomerId(),
+                record.getRiskEvent().getRiskScore(),
+                record.getRiskEvent().getDecision(),
+                record.getSeverity(),
+                record.getStatus(),
+                record.getSource(),
+                record.getAssignee(),
+                record.getDisposition(),
+                record.getNotes(),
+                record.getCreatedAt(),
+                record.getUpdatedAt()
         );
     }
 }
