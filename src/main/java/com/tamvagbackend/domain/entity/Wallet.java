@@ -32,7 +32,12 @@ public class Wallet {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt = Instant.now();
 
-    @OneToMany(mappedBy = "wallet", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    @OneToMany(
+        mappedBy = "wallet",
+        cascade = CascadeType.ALL,
+        orphanRemoval = true,
+        fetch = FetchType.EAGER
+    )
     private List<WalletBalance> balances = new ArrayList<>();
 
     public Wallet() {
@@ -48,24 +53,64 @@ public class Wallet {
         this.updatedAt = Instant.now();
     }
 
-    public UUID getWalletId() { return walletId; }
-    public void setWalletId(UUID walletId) { this.walletId = walletId; }
+    public UUID getWalletId() {
+        return walletId;
+    }
 
-    public Customer getCustomer() { return customer; }
-    public void setCustomer(Customer customer) { this.customer = customer; }
+    public void setWalletId(UUID walletId) {
+        this.walletId = walletId;
+    }
 
-    public String getDefaultCurrency() { return defaultCurrency; }
-    public void setDefaultCurrency(String defaultCurrency) { this.defaultCurrency = defaultCurrency; }
+    public Customer getCustomer() {
+        return customer;
+    }
 
-    public String getStatus() { return status; }
-    public void setStatus(String status) { this.status = status; }
+    public void setCustomer(Customer customer) {
+        this.customer = customer;
+    }
 
-    public Instant getCreatedAt() { return createdAt; }
-    public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
+    public String getDefaultCurrency() {
+        return defaultCurrency;
+    }
 
-    public Instant getUpdatedAt() { return updatedAt; }
-    public void setUpdatedAt(Instant updatedAt) { this.updatedAt = updatedAt; }
+    public void setDefaultCurrency(String defaultCurrency) {
+        this.defaultCurrency = defaultCurrency;
+    }
 
-    public List<WalletBalance> getBalances() { return balances; }
-    public void setBalances(List<WalletBalance> balances) { this.balances = balances; }
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(Instant createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public Instant getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(Instant updatedAt) {
+        this.updatedAt = updatedAt;
+    }
+
+    public List<WalletBalance> getBalances() {
+        return balances;
+    }
+
+    public void setBalances(List<WalletBalance> balances) {
+        this.balances = balances;
+    }
+
+    public void addBalance(WalletBalance balance) {
+        balances.add(balance);
+        balance.setWallet(this);
+    }
 }
