@@ -9,6 +9,9 @@ import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
+import java.nio.charset.StandardCharsets;
+import java.util.UUID;
+
 @Service
 @ConditionalOnProperty(name = "tamva.kafka.enabled", havingValue = "true")
 public class TransactionEventConsumer {
@@ -18,6 +21,7 @@ public class TransactionEventConsumer {
     private final LedgerService ledgerService;
     private final RedisIdempotencyService idempotencyService;
     private final KafkaTemplate<String, Object> kafkaTemplate;
+    private final WebhookDeliveryService webhookDeliveryService;
 
     @Value("${tamva.kafka.topics.transaction-normalised:tamva.transaction.normalised}")
     private String normalisedTopic;
@@ -28,11 +32,13 @@ public class TransactionEventConsumer {
     public TransactionEventConsumer(
             LedgerService ledgerService,
             RedisIdempotencyService idempotencyService,
-            KafkaTemplate<String, Object> kafkaTemplate
+            KafkaTemplate<String, Object> kafkaTemplate,
+            WebhookDeliveryService webhookDeliveryService
     ) {
         this.ledgerService = ledgerService;
         this.idempotencyService = idempotencyService;
         this.kafkaTemplate = kafkaTemplate;
+        this.webhookDeliveryService = webhookDeliveryService;
     }
 
     @KafkaListener(
@@ -40,19 +46,27 @@ public class TransactionEventConsumer {
             groupId = "${spring.kafka.consumer.group-id:tamva-ingestion-group}"
     )
     public void consumeTransactionEvent(TransactionIngestionEvent event) {
-        log.info("Kafka Consumer received transaction event from account {} with sourceEventId {}", event.accountId(), event.sourceEventId());
+        log.info(
+                "Kafka Consumer received transaction event from account {} with sourceEventId {}",
+                event.accountId(),
+                event.sourceEventId()
+        );
 
-        String idempotencyLockKey = event.accountId().toString() + ":" + event.sourceEventId();
+        String idempotencyLockKey =
+                event.accountId().toString() + ":" + event.sourceEventId();
 
-        // 1. Redis Distributed Idempotency Lock
-        boolean acquired = idempotencyService.acquireIdempotencyLock(idempotencyLockKey, 3600); // 1 hour TTL
+        boolean acquired =
+                idempotencyService.acquireIdempotencyLock(idempotencyLockKey, 3600);
+
         if (!acquired) {
-            log.warn("Redis Idempotency Check: Transaction event already processed or currently locked: {}", idempotencyLockKey);
+            log.warn(
+                    "Redis Idempotency Check: Transaction event already processed or currently locked: {}",
+                    idempotencyLockKey
+            );
             return;
         }
 
         try {
-            // 2. Normalize and record into PostgreSQL double-entry ledger
             ledgerService.recordTransaction(
                     event.accountId(),
                     event.sourceEventId(),
@@ -66,20 +80,75 @@ public class TransactionEventConsumer {
                     event.sourceSystem()
             );
 
-            log.info("Successfully ingested transaction event {} into ledger", event.sourceEventId());
+            log.info(
+                    "Successfully ingested transaction event {} into ledger",
+                    event.sourceEventId()
+            );
 
-            // 3. Publish to normalised topic for risk engine & features processing
-            kafkaTemplate.send(normalisedTopic, idempotencyLockKey, event);
+            /*
+             * The webhook is emitted only after successful ledger ingestion.
+             *
+             * event_id is part of the public transaction event contract and is
+             * converted into a deterministic UUID for webhook delivery
+             * persistence. If an event_id is unavailable, the stable
+             * account_id + source_event_id identity is used instead.
+             */
+            UUID webhookEventId = toWebhookEventId(event);
+
+            webhookDeliveryService.enqueueEvent(
+                    webhookEventId,
+                    "transaction.created",
+                    event
+            );
+
+            kafkaTemplate.send(
+                    normalisedTopic,
+                    idempotencyLockKey,
+                    event
+            );
 
         } catch (Exception e) {
-            log.error("Failed to process transaction event {}, routing to DLQ {}: {}", event.sourceEventId(), dlqTopic, e.getMessage(), e);
+            log.error(
+                    "Failed to process transaction event {}, routing to DLQ {}: {}",
+                    event.sourceEventId(),
+                    dlqTopic,
+                    e.getMessage(),
+                    e
+            );
+
             idempotencyService.releaseLock(idempotencyLockKey);
 
             try {
-                kafkaTemplate.send(dlqTopic, idempotencyLockKey, event);
+                kafkaTemplate.send(
+                        dlqTopic,
+                        idempotencyLockKey,
+                        event
+                );
             } catch (Exception dlqException) {
-                log.error("Failed to publish to DLQ topic: {}", dlqException.getMessage());
+                log.error(
+                        "Failed to publish to DLQ topic: {}",
+                        dlqException.getMessage()
+                );
             }
         }
+    }
+
+    private UUID toWebhookEventId(TransactionIngestionEvent event) {
+        if (event.eventId() != null && !event.eventId().isBlank()) {
+            try {
+                return UUID.fromString(event.eventId());
+            } catch (IllegalArgumentException ignored) {
+                return UUID.nameUUIDFromBytes(
+                        event.eventId().getBytes(StandardCharsets.UTF_8)
+                );
+            }
+        }
+
+        String stableIdentity =
+                event.accountId().toString() + ":" + event.sourceEventId();
+
+        return UUID.nameUUIDFromBytes(
+                stableIdentity.getBytes(StandardCharsets.UTF_8)
+        );
     }
 }

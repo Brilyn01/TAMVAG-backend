@@ -98,22 +98,7 @@ public class RiskEngineService {
         String decision = policyDecision.decision();
         String recommendedAction = policyDecision.recommendedAction();
 
-        String effectiveRulesetVersion =
-            rulesEngine.getRulesetVersion();
-
-            if (riskScore >= 90) {
-                decision = "BLOCK";
-                recommendedAction = "REJECT_TRANSACTION";
-            } else if (riskScore >= 70) {
-                decision = "HOLD";
-                recommendedAction = "STEP_UP_AUTHENTICATION";
-            } else if (riskScore >= 40) {
-                decision = "CHALLENGE";
-                recommendedAction = "STEP_UP_AUTHENTICATION";
-            } else {
-                decision = "ALLOW";
-                recommendedAction = "NONE";
-            }
+        String effectiveRulesetVersion = rulesEngine.getRulesetVersion();
 
         // Persist RiskEvent
         RiskEvent event = new RiskEvent();

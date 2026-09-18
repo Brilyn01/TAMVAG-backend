@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.ArrayList;
 
 @Service
 public class AuditService {
@@ -63,6 +64,45 @@ public class AuditService {
         return auditEventRepository.findByResourceTypeAndResourceIdOrderByTimestampDesc(resourceType, resourceId).stream()
                 .map(this::toResponse)
                 .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public boolean verifyChain() {
+        List<AuditEvent> events =
+                auditEventRepository.findAllByOrderByTimestampAsc();
+
+        String previousHash = "GENESIS_TAMVA_ROOT_BLOCK_2026";
+
+        for (AuditEvent event : events) {
+            String dataToHash =
+                    previousHash
+                            + "|"
+                            + event.getTimestamp().toString()
+                            + "|"
+                            + event.getActorId()
+                            + "|"
+                            + event.getAction()
+                            + "|"
+                            + event.getResourceId()
+                            + "|"
+                            + (event.getPayload() != null
+                            ? event.getPayload()
+                            : "");
+
+            String expectedHash = sha256(dataToHash);
+
+            if (!expectedHash.equals(event.getEventHash())) {
+                log.error(
+                        "[AUDIT] Hash-chain verification failed for audit event {}",
+                        event.getAuditId()
+                );
+                return false;
+            }
+
+            previousHash = event.getEventHash();
+        }
+
+        return true;
     }
 
     private AuditEventResponse toResponse(AuditEvent e) {

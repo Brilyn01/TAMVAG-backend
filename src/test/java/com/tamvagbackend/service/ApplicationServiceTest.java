@@ -20,7 +20,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -41,6 +41,8 @@ class ApplicationServiceTest {
     private UUID institutionId;
     private UUID applicationId;
     private Institution institution;
+
+    private Application savedApplication;
 
     @BeforeEach
     void setUp() {
@@ -77,9 +79,10 @@ class ApplicationServiceTest {
 
         when(applicationRepository.save(any(Application.class)))
                 .thenAnswer(invocation -> {
-                    Application application = invocation.getArgument(0);
-                    application.setApplicationId(applicationId);
-                    return application;
+                Application application = invocation.getArgument(0);
+                application.setApplicationId(applicationId);
+                savedApplication = application;
+                return application;
                 });
 
         ApplicationDtos.CreateApplicationResponse response =
@@ -95,8 +98,9 @@ class ApplicationServiceTest {
         assertEquals("Test Partner", response.application().name());
         assertEquals("ACTIVE", response.application().status());
 
-        Application savedApplication =
-                responseToSavedApplication();
+        verify(applicationRepository).save(any(Application.class));
+
+        assertNotNull(savedApplication);
 
         assertNotNull(savedApplication.getClientSecretHash());
         assertNotEquals(
@@ -270,12 +274,5 @@ class ApplicationServiceTest {
         );
 
         return application;
-    }
-
-    private Application responseToSavedApplication() {
-        org.mockito.ArgumentCaptor<Application> captor =
-                org.mockito.ArgumentCaptor.forClass(Application.class);
-        verify(applicationRepository).save(captor.capture());
-        return captor.getValue();
     }
 }

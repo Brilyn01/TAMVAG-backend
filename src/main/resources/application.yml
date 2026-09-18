@@ -135,3 +135,10 @@ tamva:
       transaction-received: tamva.transaction.received
       transaction-normalised: tamva.transaction.normalised
       transaction-dlq: tamva.transaction.dlq
+  webhook:
+    encryption-key: ${TAMVA_WEBHOOK_ENCRYPTION_KEY:change-this-development-webhook-encryption-key-32chars}
+    max-attempts: ${TAMVA_WEBHOOK_MAX_ATTEMPTS:8}
+    initial-retry-seconds: ${TAMVA_WEBHOOK_INITIAL_RETRY_SECONDS:30}
+    max-retry-seconds: ${TAMVA_WEBHOOK_MAX_RETRY_SECONDS:3600}
+    stale-delivery-seconds: ${TAMVA_WEBHOOK_STALE_DELIVERY_SECONDS:120}
+    poll-interval-ms: ${TAMVA_WEBHOOK_POLL_INTERVAL_MS:5000}

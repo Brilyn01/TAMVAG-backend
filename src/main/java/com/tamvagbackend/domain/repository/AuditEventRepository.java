@@ -14,4 +14,5 @@ public interface AuditEventRepository extends JpaRepository<AuditEvent, UUID> {
     List<AuditEvent> findTop50ByOrderByTimestampDesc();
     List<AuditEvent> findByResourceTypeAndResourceIdOrderByTimestampDesc(String resourceType, String resourceId);
     Optional<AuditEvent> findTopByOrderByTimestampDesc();
+    List<AuditEvent> findAllByOrderByTimestampAsc();
 }
