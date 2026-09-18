@@ -1,5 +1,7 @@
 package com.tamvagbackend.service;
 
+import org.springframework.security.crypto.password.PasswordEncoder;
+
 import com.tamvagbackend.domain.entity.*;
 import com.tamvagbackend.domain.repository.*;
 import org.slf4j.Logger;
@@ -18,6 +20,7 @@ public class DataSeederService implements CommandLineRunner {
 
     private static final Logger log = LoggerFactory.getLogger(DataSeederService.class);
 
+    private final PasswordEncoder passwordEncoder;
     private final InstitutionRepository institutionRepository;
     private final ApplicationRepository applicationRepository;
     private final CustomerRepository customerRepository;
@@ -37,7 +40,8 @@ public class DataSeederService implements CommandLineRunner {
             ConsentRepository consentRepository,
             ExchangeRateRepository exchangeRateRepository,
             LedgerService ledgerService,
-            MultiCurrencyWalletService walletService
+            MultiCurrencyWalletService walletService,
+            PasswordEncoder passwordEncoder
     ) {
         this.institutionRepository = institutionRepository;
         this.applicationRepository = applicationRepository;
@@ -48,6 +52,7 @@ public class DataSeederService implements CommandLineRunner {
         this.exchangeRateRepository = exchangeRateRepository;
         this.ledgerService = ledgerService;
         this.walletService = walletService;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @Override
@@ -68,13 +73,22 @@ public class DataSeederService implements CommandLineRunner {
         Institution fidelity = institutionRepository.save(new Institution(UUID.fromString("55555555-5555-5555-5555-555555555555"), "Fidelity Bank Ghana", "BANK", "ACTIVE", "BOG/BANK/FBG/012"));
 
         // 2. Seed Partner Application
+
+        String seedClientSecret =
+            System.getenv().getOrDefault(
+                    "TAMVA_SEED_CLIENT_SECRET",
+                    "gcb-pilot-secret-2026"
+            );
+
         Application partnerApp = new Application();
         partnerApp.setInstitution(gcb);
         partnerApp.setClientId("app_gcb_pilot_2026");
-        partnerApp.setClientSecretHash("hash_secret_gcb_2026");
+        partnerApp.setClientSecretHash(
+                passwordEncoder.encode(seedClientSecret)
+        );
         partnerApp.setName("GCB Digital Risk & Credit Hub");
         partnerApp.setStatus("ACTIVE");
-        partnerApp.setScopes("[\"risk:evaluate\", \"profile:read\", \"consent:create\"]");
+        partnerApp.setScopes("[\"risk:evaluate\", \"profile:read\", \"consent:create\", \"connector:sync\"]");
         applicationRepository.save(partnerApp);
 
         // 3. Seed Exchange Rates Matrix (GHS base against NGN, KES, ZAR, EGP, USD, GBP, EUR)

@@ -85,7 +85,9 @@ tamva:
   ruleset-version: rules-2026.09.1
   model-version: fraud-v3.2
   default-currency: GHS
-  jwt-secret: ${TAMVA_JWT_SECRET:tamva-secure-default-development-secret-key-2026-ghana}
+  security:
+    jwt-secret: ${TAMVA_JWT_SECRET:change-this-development-secret-to-a-long-random-value-2026}
+    access-token-ttl-seconds: ${TAMVA_ACCESS_TOKEN_TTL_SECONDS:3600}
   kafka:
     enabled: false   # Set to true only when a Kafka broker is available
     topics:
