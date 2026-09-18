@@ -143,10 +143,11 @@ public class LedgerService {
          * constraint and repository lookup.
          */
         Optional<Transaction> existing =
-                transactionRepository.findByAccountAndSourceEventId(
-                        account,
-                        normalizedTransaction.getSourceEventId()
-                );
+            transactionRepository.findByAccountAndSourceSystemAndSourceEventId(
+                    account,
+                    normalizedTransaction.getSourceSystem(),
+                    normalizedTransaction.getSourceEventId()
+            );
 
         if (existing.isPresent()) {
             log.info(

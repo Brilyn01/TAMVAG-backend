@@ -7,7 +7,10 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "transaction", uniqueConstraints = {
-    @UniqueConstraint(name = "uq_account_source_event", columnNames = {"account_id", "source_event_id"})
+    @UniqueConstraint(
+            name = "uq_account_source_system_event",
+            columnNames = {"account_id", "source_system", "source_event_id"}
+    )
 })
 public class Transaction {
 
@@ -49,7 +52,7 @@ public class Transaction {
     @Column(name = "reference")
     private String reference;
 
-    @Column(name = "source_system")
+    @Column(name = "source_system", nullable = false, length = 100)
     private String sourceSystem;
 
     @Column(name = "normalisation_version", nullable = false)

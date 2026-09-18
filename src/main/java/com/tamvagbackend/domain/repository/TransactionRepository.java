@@ -14,11 +14,30 @@ import java.util.UUID;
 
 @Repository
 public interface TransactionRepository extends JpaRepository<Transaction, UUID> {
-    Optional<Transaction> findByAccountAndSourceEventId(Account account, String sourceEventId);
+    Optional<Transaction> findByAccountAndSourceSystemAndSourceEventId(
+        Account account,
+        String sourceSystem,
+        String sourceEventId
+    );
     List<Transaction> findByAccountOrderByOccurredAtDesc(Account account);
 
     @Query("SELECT t FROM Transaction t WHERE t.account.customer.customerId = :customerId AND t.occurredAt >= :since ORDER BY t.occurredAt DESC")
     List<Transaction> findRecentByCustomer(@Param("customerId") UUID customerId, @Param("since") Instant since);
+
+    @Query("""
+        SELECT t
+        FROM Transaction t
+        WHERE t.account.customer.customerId = :customerId
+            AND t.occurredAt >= :start
+            AND t.occurredAt < :end
+        ORDER BY t.occurredAt ASC
+        """)
+        
+    List<Transaction> findByCustomerAndOccurredAtBetween(
+        @Param("customerId") UUID customerId,
+        @Param("start") Instant start,
+        @Param("end") Instant end);
+
 
     @Query("SELECT t FROM Transaction t WHERE t.account.customer.customerId = :customerId ORDER BY t.occurredAt DESC")
     List<Transaction> findAllByCustomerId(@Param("customerId") UUID customerId);
