@@ -273,9 +273,9 @@ class ApplicationServiceTest {
     }
 
     private Application responseToSavedApplication() {
-        verify(applicationRepository).save(any(Application.class));
-
-        return applicationRepository
-                .save(any(Application.class));
+        org.mockito.ArgumentCaptor<Application> captor =
+                org.mockito.ArgumentCaptor.forClass(Application.class);
+        verify(applicationRepository).save(captor.capture());
+        return captor.getValue();
     }
 }

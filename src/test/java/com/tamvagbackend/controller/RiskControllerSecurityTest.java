@@ -67,8 +67,8 @@ class RiskControllerSecurityTest {
 
         return """
                 {
-                  "customerId": "%s",
-                  "accountId": null,
+                  "customer_id": "%s",
+                  "account_id": null,
                   "amount": 8500.00,
                   "currency": "GHS",
                   "destination": {
@@ -76,9 +76,9 @@ class RiskControllerSecurityTest {
                     "identifier": "0240001122",
                     "reference": "REF123"
                   },
-                  "deviceId": "dev_fingerprint_999",
+                  "device_id": "dev_fingerprint_999",
                   "channel": "MOBILE_APP",
-                  "occurredAt": "%s",
+                  "occurred_at": "%s",
                   "context": {
                     "authentication_method": "MFA"
                   }
