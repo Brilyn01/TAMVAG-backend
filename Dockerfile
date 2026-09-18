@@ -24,9 +24,8 @@ USER appuser
 
 COPY --from=builder /workspace/build/libs/*.jar app.jar
 
-# Render exposes PORT env var, defaults to 8080
-ENV PORT=8080
-EXPOSE ${PORT}
+# Render supplies PORT for the web service.
+# Keep 8080 as the local/default Spring Boot port.
+EXPOSE 8080
 
-# Run with container-aware memory flags
-ENTRYPOINT ["java", "-XX:+UseContainerSupport", "-XX:MaxRAMPercentage=75.0", "-Dserver.port=${PORT}", "-jar", "app.jar"]
+ENTRYPOINT ["sh", "-c", "exec java -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Dserver.port=${PORT:-8080} -jar app.jar"]
