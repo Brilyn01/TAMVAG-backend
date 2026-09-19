@@ -6,6 +6,7 @@ import jakarta.validation.ConstraintViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -107,16 +108,29 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<ApiError> handleIllegalState(
-            IllegalStateException ex,
-            HttpServletRequest request
-    ) {
+                IllegalStateException ex,
+                HttpServletRequest request
+        ) {
+                return build(
+                        HttpStatus.CONFLICT,
+                        ex.getMessage(),
+                        request,
+                        null
+                );
+        }
+
+        @ExceptionHandler(BadCredentialsException.class)
+        public ResponseEntity<ApiError> handleBadCredentials(
+                BadCredentialsException ex,
+                HttpServletRequest request
+        ) {
         return build(
-                HttpStatus.CONFLICT,
+                HttpStatus.UNAUTHORIZED,
                 ex.getMessage(),
                 request,
                 null
         );
-    }
+        }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiError> handleUnexpected(
