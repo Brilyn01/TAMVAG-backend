@@ -22,4 +22,5 @@ public interface ConnectionRepository extends JpaRepository<Connection, UUID> {
     );
 
     List<Connection> findByCustomer(Customer customer);
+    List<Connection> findByInstitution_InstitutionId(UUID institutionId);
 }

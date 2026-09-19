@@ -2,6 +2,7 @@ package com.tamvagbackend.controller;
 
 import com.tamvagbackend.dto.AuditDtos.ConnectorSyncRequest;
 import com.tamvagbackend.dto.AuditDtos.ConnectorSyncResponse;
+import com.tamvagbackend.dto.AuditDtos.ConnectionResponse;
 import com.tamvagbackend.service.ConnectorService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -26,6 +27,24 @@ public class ConnectorController {
 
     public ConnectorController(ConnectorService connectorService) {
         this.connectorService = connectorService;
+    }
+
+    @GetMapping
+    @PreAuthorize("hasAuthority('SCOPE_connector:read')")
+    @Operation(
+        summary = "List connector connections",
+        description = "Lists customer financial connections belonging to the authenticated institution"
+    )
+        public ResponseEntity<java.util.List<ConnectionResponse>> getConnections(
+                @AuthenticationPrincipal Jwt jwt
+        ) {
+        UUID institutionId = UUID.fromString(
+                jwt.getClaimAsString("institution_id")
+        );
+
+        return ResponseEntity.ok(
+                connectorService.getConnections(institutionId)
+        );
     }
 
     @PostMapping("/{id}/sync")

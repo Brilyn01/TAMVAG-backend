@@ -6,6 +6,7 @@ import com.tamvagbackend.domain.repository.AccountRepository;
 import com.tamvagbackend.domain.repository.ConnectionRepository;
 import com.tamvagbackend.dto.AuditDtos.ConnectorSyncRequest;
 import com.tamvagbackend.dto.AuditDtos.ConnectorSyncResponse;
+import com.tamvagbackend.dto.AuditDtos.ConnectionResponse;
 import com.tamvagbackend.service.connector.ConnectorProvider;
 import com.tamvagbackend.service.connector.ConnectorProviderRegistry;
 import org.springframework.http.HttpStatus;
@@ -45,6 +46,25 @@ public class ConnectorService {
         this.auditService = auditService;
         this.quarantineService = quarantineService;
     }
+
+    @Transactional(readOnly = true)
+    public List<ConnectionResponse> getConnections(
+        UUID authenticatedInstitutionId
+    ) {
+        return connectionRepository
+                .findByInstitution_InstitutionId(authenticatedInstitutionId)
+                .stream()
+                .map(connection -> new ConnectionResponse(
+                        connection.getConnectionId(),
+                        connection.getCustomer().getCustomerId(),
+                        connection.getInstitution().getInstitutionId(),
+                        connection.getStatus(),
+                        connection.getProviderRef(),
+                        connection.getLastSyncAt(),
+                        connection.getCreatedAt()
+                ))
+                .toList();
+        }
 
     @Transactional
     public ConnectorSyncResponse sync(

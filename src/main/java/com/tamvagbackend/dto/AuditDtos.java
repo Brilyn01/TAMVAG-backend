@@ -8,61 +8,83 @@ import java.util.UUID;
 public class AuditDtos {
 
     public record AuditEventResponse(
-            @JsonProperty("audit_id")
-            UUID auditId,
+        @JsonProperty("audit_id")
+        UUID auditId,
 
-            @JsonProperty("actor_type")
-            String actorType,
+        @JsonProperty("actor_type")
+        String actorType,
 
-            @JsonProperty("actor_id")
-            String actorId,
+        @JsonProperty("actor_id")
+        String actorId,
 
-            String action,
+        String action,
 
-            @JsonProperty("resource_type")
-            String resourceType,
+        @JsonProperty("resource_type")
+        String resourceType,
 
-            @JsonProperty("resource_id")
-            String resourceId,
+        @JsonProperty("resource_id")
+        String resourceId,
 
-            Instant timestamp,
+        Instant timestamp,
 
-            @JsonProperty("correlation_id")
-            String correlationId,
+        @JsonProperty("correlation_id")
+        String correlationId,
 
-            @JsonProperty("event_hash")
-            String eventHash,
+        @JsonProperty("event_hash")
+        String eventHash,
 
-            String payload
+        String payload
     ) {}
 
     public record ConnectorSyncRequest(
-            @JsonProperty("customer_id")
-            UUID customerId,
+        @JsonProperty("customer_id")
+        UUID customerId,
 
-            @JsonProperty("institution_id")
-            UUID institutionId,
+        @JsonProperty("institution_id")
+        UUID institutionId,
 
-            @JsonProperty("sync_mode")
-            String syncMode // FULL, INCREMENTAL
-    ) {}
+        @JsonProperty("sync_mode")
+        String syncMode // FULL, INCREMENTAL
+        ) {}
 
     public record ConnectorSyncResponse(
-            @JsonProperty("sync_id")
-            String syncId,
+        @JsonProperty("sync_id")
+        String syncId,
 
-            String status,
+        String status,
 
-            @JsonProperty("records_ingested")
-            int recordsIngested,
+        @JsonProperty("records_ingested")
+        int recordsIngested,
 
-            @JsonProperty("records_normalized")
-            int recordsNormalized,
+        @JsonProperty("records_normalized")
+        int recordsNormalized,
 
-            @JsonProperty("records_quarantined")
-            int recordsQuarantined,
+        @JsonProperty("records_quarantined")
+        int recordsQuarantined,
 
-            @JsonProperty("synced_at")
-            Instant syncedAt
+        @JsonProperty("synced_at")
+        Instant syncedAt
+    ) {}
+
+    public record ConnectionResponse(
+        @JsonProperty("connection_id")
+        UUID connectionId,
+
+        @JsonProperty("customer_id")
+        UUID customerId,
+
+        @JsonProperty("institution_id")
+        UUID institutionId,
+
+        String status,
+
+        @JsonProperty("provider_ref")
+        String providerRef,
+
+        @JsonProperty("last_sync_at")
+        Instant lastSyncAt,
+
+        @JsonProperty("created_at")
+        Instant createdAt
     ) {}
 }
