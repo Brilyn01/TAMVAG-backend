@@ -16,7 +16,11 @@ import java.util.Map;
 public class HealthController {
 
     @GetMapping
-    @Operation(summary = "Health check endpoint", description = "Used by Render container orchestrator for zero-downtime deployment health validation")
+    @Operation(
+        summary = "Health check",
+        description = "Returns the current API health status",
+        security = {}
+    )
     public ResponseEntity<Map<String, Object>> checkHealth() {
         return ResponseEntity.ok(Map.of(
                 "status", "UP",
