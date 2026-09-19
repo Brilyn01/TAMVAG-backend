@@ -26,11 +26,20 @@ public class OpenApiConfig {
                         .description("""
                                 Engineering API specification for TAMVA.
 
-                                This API provides authentication, application management,
-                                customer profiles, consent management, risk decisioning,
-                                transaction ingestion, cases, connector synchronization,
-                                webhooks, financial passport, audit, and multi-currency
-                                wallet capabilities.
+                                Use POST /v1/auth/token first to obtain a JWT.
+                                In Swagger UI, click Authorize and paste only the
+                                access token; Swagger adds the Bearer prefix.
+
+                                Seeded pilot test data:
+                                GCB institution = 33333333-3333-3333-3333-333333333333
+                                Kwame customer = a1b2c3d4-0000-0000-0000-000000000001
+                                Abena customer = a1b2c3d4-0000-0000-0000-000000000002
+                                Pilot client ID = app_gcb_pilot_2026
+                                Pilot client secret = gcb-pilot-secret-2026
+
+                                IDs generated at runtime, such as application_id,
+                                account_id, connection_id, case_id and passport_id,
+                                should be copied from the corresponding GET/POST response.
                                 """)
                         .version("1.0.0")
                         .contact(new Contact()
@@ -51,9 +60,8 @@ public class OpenApiConfig {
                                         .scheme("bearer")
                                         .bearerFormat("JWT")
                                         .description(
-                                                "Enter the JWT access token returned by " +
-                                                "POST /v1/auth/token. Do not include the " +
-                                                "'Bearer ' prefix."
+                                                "Paste the access_token returned by " +
+                                                "POST /v1/auth/token. Do not include 'Bearer '."
                                         )
                         ))
                 .addSecurityItem(

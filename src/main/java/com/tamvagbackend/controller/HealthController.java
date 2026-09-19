@@ -17,9 +17,9 @@ public class HealthController {
 
     @GetMapping
     @Operation(
-        summary = "Health check",
-        description = "Returns the current API health status",
-        security = {}
+            summary = "Health check endpoint",
+            description = "Used by Render container orchestrator for zero-downtime deployment health validation",
+            security = {}
     )
     public ResponseEntity<Map<String, Object>> checkHealth() {
         return ResponseEntity.ok(Map.of(

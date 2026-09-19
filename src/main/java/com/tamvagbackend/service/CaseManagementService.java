@@ -29,23 +29,29 @@ public class CaseManagementService {
     @Transactional(readOnly = true)
     public List<CaseResponse> getCases(
             String status,
-            String severity
+            String severity,
+            UUID institutionId
     ) {
+        if (institutionId == null) {
+            throw new IllegalArgumentException("institution_id is required");
+        }
         List<CaseRecord> records;
 
         if (status != null && !status.isBlank()) {
             String normalizedStatus = normalize(status);
             validateStatus(normalizedStatus);
-            records = caseRecordRepository.findByStatus(normalizedStatus);
+            records = caseRecordRepository.findByStatusAndRiskEvent_Account_Institution_InstitutionId(normalizedStatus, institutionId);
 
         } else if (severity != null && !severity.isBlank()) {
             String normalizedSeverity = normalize(severity);
             validateSeverity(normalizedSeverity);
-            records = caseRecordRepository.findBySeverity(normalizedSeverity);
+            records = caseRecordRepository.findBySeverityAndRiskEvent_Account_Institution_InstitutionId(normalizedSeverity, institutionId);
 
         } else {
             records = caseRecordRepository
-                    .findTop50ByOrderByCreatedAtDesc();
+                    .findTop50ByRiskEvent_Account_Institution_InstitutionIdOrderByCreatedAtDesc(
+                            institutionId
+                    );
         }
 
         return records.stream()
@@ -54,13 +60,23 @@ public class CaseManagementService {
     }
 
     @Transactional(readOnly = true)
-    public CaseResponse getCase(UUID caseId) {
+    public CaseResponse getCase(
+            UUID caseId,
+            UUID institutionId
+    ) {
         if (caseId == null) {
             throw new IllegalArgumentException("case_id is required");
         }
 
+        if (institutionId == null) {
+            throw new IllegalArgumentException("institution_id is required");
+        }
+
         CaseRecord record = caseRecordRepository
-                .findById(caseId)
+                .findByCaseIdAndRiskEvent_Account_Institution_InstitutionId(
+                        caseId,
+                        institutionId
+                )
                 .orElseThrow(() ->
                         new IllegalArgumentException(
                                 "Case not found: " + caseId
@@ -73,6 +89,7 @@ public class CaseManagementService {
     @Transactional
     public CaseResponse updateCase(
             UUID caseId,
+            UUID institutionId,
             CaseActionRequest request
     ) {
         if (caseId == null) {
@@ -85,8 +102,15 @@ public class CaseManagementService {
             );
         }
 
+        if (institutionId == null) {
+            throw new IllegalArgumentException("institution_id is required");
+        }
+
         CaseRecord record = caseRecordRepository
-                .findById(caseId)
+                .findByCaseIdAndRiskEvent_Account_Institution_InstitutionId(
+                        caseId,
+                        institutionId
+                )
                 .orElseThrow(() ->
                         new IllegalArgumentException(
                                 "Case not found: " + caseId

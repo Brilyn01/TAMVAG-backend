@@ -23,12 +23,12 @@ public class AuthController {
         this.authenticationService = authenticationService;
     }
 
-    @Operation(
-        summary = "Obtain access token",
-        description = "Authenticates a partner application and returns a JWT access token",
-        security = {}
-    )
     @PostMapping("/token")
+    @Operation(
+            summary = "Issue an access token",
+            description = "Authenticates a TAMVA partner application using client credentials",
+            security = {}
+    )
     public ResponseEntity<TokenResponse> token(
             @Valid @RequestBody TokenRequest request
     ) {

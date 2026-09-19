@@ -1,6 +1,7 @@
 package com.tamvagbackend.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -38,12 +39,25 @@ public class AuditDtos {
 
     public record ConnectorSyncRequest(
         @JsonProperty("customer_id")
+        @Schema(
+                description = "Customer owning the connection",
+                example = "a1b2c3d4-0000-0000-0000-000000000001"
+        )
         UUID customerId,
 
         @JsonProperty("institution_id")
+        @Schema(
+                description = "Authenticated institution",
+                example = "33333333-3333-3333-3333-333333333333"
+        )
         UUID institutionId,
 
         @JsonProperty("sync_mode")
+        @Schema(
+                description = "Synchronization mode",
+                example = "INCREMENTAL",
+                allowableValues = {"FULL", "INCREMENTAL"}
+        )
         String syncMode // FULL, INCREMENTAL
         ) {}
 

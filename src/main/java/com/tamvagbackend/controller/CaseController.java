@@ -9,6 +9,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -41,10 +43,15 @@ public class CaseController {
             @RequestParam(required = false) String status,
 
             @Parameter(description = "Case severity filter")
-            @RequestParam(required = false) String severity
+            @RequestParam(required = false) String severity,
+            @AuthenticationPrincipal Jwt jwt
     ) {
         return ResponseEntity.ok(
-                caseManagementService.getCases(status, severity)
+                caseManagementService.getCases(
+                        status,
+                        severity,
+                        institutionId(jwt)
+                )
         );
     }
 
@@ -55,10 +62,14 @@ public class CaseController {
             description = "Returns a single risk case by case ID"
     )
     public ResponseEntity<CaseResponse> getCase(
-            @PathVariable UUID caseId
+            @PathVariable UUID caseId,
+            @AuthenticationPrincipal Jwt jwt
     ) {
         return ResponseEntity.ok(
-                caseManagementService.getCase(caseId)
+                caseManagementService.getCase(
+                        caseId,
+                        institutionId(jwt)
+                )
         );
     }
 
@@ -77,10 +88,21 @@ public class CaseController {
     )
     public ResponseEntity<CaseResponse> updateCase(
             @PathVariable UUID caseId,
-            @Valid @RequestBody CaseActionRequest request
+            @Valid @RequestBody CaseActionRequest request,
+            @AuthenticationPrincipal Jwt jwt
     ) {
         return ResponseEntity.ok(
-                caseManagementService.updateCase(caseId, request)
+                caseManagementService.updateCase(
+                        caseId,
+                        institutionId(jwt),
+                        request
+                )
+        );
+    }
+
+    private UUID institutionId(Jwt jwt) {
+        return UUID.fromString(
+                jwt.getClaimAsString("institution_id")
         );
     }
 }

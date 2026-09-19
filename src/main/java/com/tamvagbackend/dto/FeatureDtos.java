@@ -1,6 +1,7 @@
 package com.tamvagbackend.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -14,9 +15,11 @@ public final class FeatureDtos {
 
     public record ComputeFeatureRequest(
             @JsonProperty("customer_id")
+            @Schema(example = "a1b2c3d4-0000-0000-0000-000000000001")
             UUID customerId,
 
             @JsonProperty("period_start")
+            @Schema(example = "2026-06-01")
             LocalDate periodStart,
 
             @JsonProperty("period_end")
@@ -29,12 +32,15 @@ public final class FeatureDtos {
             UUID featureSnapshotId,
 
             @JsonProperty("customer_id")
+            @Schema(example = "a1b2c3d4-0000-0000-0000-000000000001")
             UUID customerId,
 
             @JsonProperty("period_start")
+            @Schema(example = "2026-06-01")
             LocalDate periodStart,
 
             @JsonProperty("period_end")
+            @Schema(example = "2026-08-31")
             LocalDate periodEnd,
 
             @JsonProperty("feature_version")

@@ -1,6 +1,7 @@
 package com.tamvagbackend.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -52,22 +53,27 @@ public class MultiCurrencyDtos {
     public record CurrencyConvertRequest(
             @NotBlank(message = "from_currency is required")
             @JsonProperty("from_currency")
+            @Schema(example = "GHS")
             String fromCurrency,
 
             @NotBlank(message = "to_currency is required")
             @JsonProperty("to_currency")
+            @Schema(example = "USD")
             String toCurrency,
 
             @NotNull(message = "amount is required")
             @DecimalMin(value = "0.0001", message = "amount must be greater than zero")
+            @Schema(example = "1000.00")
             BigDecimal amount
     ) {}
 
     public record CurrencyConvertResponse(
             @JsonProperty("from_currency")
+            @Schema(example = "GHS")
             String fromCurrency,
 
             @JsonProperty("to_currency")
+            @Schema(example = "USD")
             String toCurrency,
 
             @JsonProperty("from_amount")
@@ -98,20 +104,25 @@ public class MultiCurrencyDtos {
     public record CurrencyTransferRequest(
             @NotNull(message = "customer_id is required")
             @JsonProperty("customer_id")
+            @Schema(example = "a1b2c3d4-0000-0000-0000-000000000001")
             UUID customerId,
 
             @NotBlank(message = "from_currency is required")
             @JsonProperty("from_currency")
+            @Schema(example = "GHS")
             String fromCurrency,
 
             @NotBlank(message = "to_currency is required")
             @JsonProperty("to_currency")
+            @Schema(example = "USD")
             String toCurrency,
 
             @NotNull(message = "amount is required")
             @DecimalMin(value = "0.01", message = "amount must be greater than zero")
+            @Schema(example = "500.00")
             BigDecimal amount,
 
+            @Schema(example = "Swagger integration test transfer")
             String reference
     ) {}
 
@@ -123,9 +134,11 @@ public class MultiCurrencyDtos {
             UUID walletId,
 
             @JsonProperty("from_currency")
+            @Schema(example = "GHS")
             String fromCurrency,
 
             @JsonProperty("to_currency")
+            @Schema(example = "USD")
             String toCurrency,
 
             @JsonProperty("from_amount")
@@ -167,6 +180,7 @@ public class MultiCurrencyDtos {
             UUID walletId,
 
             @JsonProperty("customer_id")
+            @Schema(example = "a1b2c3d4-0000-0000-0000-000000000001")
             UUID customerId,
 
             @JsonProperty("default_currency")
