@@ -9,7 +9,6 @@ import com.tamvagbackend.dto.ApplicationDtos;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -86,7 +85,7 @@ class ApplicationServiceTest {
                 });
 
         ApplicationDtos.CreateApplicationResponse response =
-                applicationService.create(request);
+                applicationService.create(request, institutionId);
 
         assertNotNull(response);
         assertNotNull(response.clientSecret());
@@ -130,7 +129,7 @@ class ApplicationServiceTest {
 
         assertThrows(
                 Exception.class,
-                () -> applicationService.create(request)
+                () -> applicationService.create(request, institutionId)
         );
 
         verify(applicationRepository, never())
@@ -141,7 +140,7 @@ class ApplicationServiceTest {
     void updateStatusAcceptsActiveAndInactive() {
         Application application = existingApplication();
 
-        when(applicationRepository.findById(applicationId))
+        when(applicationRepository.findByApplicationIdAndInstitution_InstitutionId(applicationId, institutionId))
                 .thenReturn(Optional.of(application));
 
         when(applicationRepository.save(any(Application.class)))
@@ -150,6 +149,7 @@ class ApplicationServiceTest {
         ApplicationDtos.ApplicationResponse response =
                 applicationService.updateStatus(
                         applicationId,
+                        institutionId,
                         new ApplicationDtos.UpdateStatusRequest("INACTIVE")
                 );
 
@@ -157,6 +157,7 @@ class ApplicationServiceTest {
 
         response = applicationService.updateStatus(
                 applicationId,
+                institutionId,
                 new ApplicationDtos.UpdateStatusRequest("ACTIVE")
         );
 
@@ -167,13 +168,14 @@ class ApplicationServiceTest {
     void updateStatusRejectsInvalidStatus() {
         Application application = existingApplication();
 
-        when(applicationRepository.findById(applicationId))
+        when(applicationRepository.findByApplicationIdAndInstitution_InstitutionId(applicationId, institutionId))
                 .thenReturn(Optional.of(application));
 
         assertThrows(
                 Exception.class,
                 () -> applicationService.updateStatus(
                         applicationId,
+                        institutionId,
                         new ApplicationDtos.UpdateStatusRequest("DELETED")
                 )
         );
@@ -186,7 +188,7 @@ class ApplicationServiceTest {
     void updateScopesNormalizesAndPersistsScopes() throws Exception {
         Application application = existingApplication();
 
-        when(applicationRepository.findById(applicationId))
+        when(applicationRepository.findByApplicationIdAndInstitution_InstitutionId(applicationId, institutionId))
                 .thenReturn(Optional.of(application));
 
         when(applicationRepository.save(any(Application.class)))
@@ -195,6 +197,7 @@ class ApplicationServiceTest {
         ApplicationDtos.ApplicationResponse response =
                 applicationService.updateScopes(
                         applicationId,
+                        institutionId,
                         new ApplicationDtos.UpdateScopesRequest(
                                 List.of(
                                         "risk:evaluate",
@@ -229,14 +232,14 @@ class ApplicationServiceTest {
 
         String oldHash = application.getClientSecretHash();
 
-        when(applicationRepository.findById(applicationId))
+        when(applicationRepository.findByApplicationIdAndInstitution_InstitutionId(applicationId, institutionId))
                 .thenReturn(Optional.of(application));
 
         when(applicationRepository.save(any(Application.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
         ApplicationDtos.RotateSecretResponse response =
-                applicationService.rotateSecret(applicationId);
+                applicationService.rotateSecret(applicationId, institutionId);
 
         assertNotNull(response.clientSecret());
         assertFalse(response.clientSecret().isBlank());

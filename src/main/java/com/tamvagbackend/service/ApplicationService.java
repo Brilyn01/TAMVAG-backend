@@ -42,8 +42,16 @@ public class ApplicationService {
     }
 
     public ApplicationDtos.CreateApplicationResponse create(
-            ApplicationDtos.CreateApplicationRequest request
+            ApplicationDtos.CreateApplicationRequest request,
+            UUID callerInstitutionId
     ) {
+        if (!callerInstitutionId.equals(request.institutionId())) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "Cannot create an application for another institution"
+            );
+        }
+
         Institution institution = institutionRepository
                 .findById(request.institutionId())
                 .orElseThrow(() -> new ResponseStatusException(
@@ -75,14 +83,18 @@ public class ApplicationService {
     }
 
     @Transactional(readOnly = true)
-    public ApplicationDtos.ApplicationResponse get(UUID applicationId) {
-        Application application = findApplication(applicationId);
+    public ApplicationDtos.ApplicationResponse get(
+            UUID applicationId,
+            UUID callerInstitutionId
+    ) {
+        Application application = findApplication(applicationId, callerInstitutionId);
         return toResponse(application);
     }
 
     @Transactional(readOnly = true)
-    public List<ApplicationDtos.ApplicationResponse> list() {
-        return applicationRepository.findAll()
+    public List<ApplicationDtos.ApplicationResponse> list(UUID callerInstitutionId) {
+        return applicationRepository
+                .findByInstitution_InstitutionId(callerInstitutionId)
                 .stream()
                 .map(this::toResponse)
                 .toList();
@@ -90,9 +102,10 @@ public class ApplicationService {
 
     public ApplicationDtos.ApplicationResponse updateStatus(
             UUID applicationId,
+            UUID callerInstitutionId,
             ApplicationDtos.UpdateStatusRequest request
     ) {
-        Application application = findApplication(applicationId);
+        Application application = findApplication(applicationId, callerInstitutionId);
 
         String status = request.status().trim().toUpperCase();
 
@@ -110,9 +123,10 @@ public class ApplicationService {
 
     public ApplicationDtos.ApplicationResponse updateScopes(
             UUID applicationId,
+            UUID callerInstitutionId,
             ApplicationDtos.UpdateScopesRequest request
     ) {
-        Application application = findApplication(applicationId);
+        Application application = findApplication(applicationId, callerInstitutionId);
 
         List<String> scopes = normalizeScopes(request.scopes());
 
@@ -122,9 +136,10 @@ public class ApplicationService {
     }
 
     public ApplicationDtos.RotateSecretResponse rotateSecret(
-            UUID applicationId
+            UUID applicationId,
+            UUID callerInstitutionId
     ) {
-        Application application = findApplication(applicationId);
+        Application application = findApplication(applicationId, callerInstitutionId);
 
         String clientSecret = generateClientSecret();
 
@@ -141,8 +156,18 @@ public class ApplicationService {
         );
     }
 
-    private Application findApplication(UUID applicationId) {
-        return applicationRepository.findById(applicationId)
+    private Application findApplication(
+            UUID applicationId,
+            UUID callerInstitutionId
+    ) {
+        // 404 rather than 403 on a cross-institution ID so callers can't
+        // use this endpoint to enumerate whether an applicationId exists
+        // under a different institution.
+        return applicationRepository
+                .findByApplicationIdAndInstitution_InstitutionId(
+                        applicationId,
+                        callerInstitutionId
+                )
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND,
                         "Application not found: " + applicationId
