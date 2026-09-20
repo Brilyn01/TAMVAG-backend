@@ -2,15 +2,15 @@ services:
   postgres:
     image: postgres:17
     environment:
-      POSTGRES_DB: tamva
-      POSTGRES_USER: tamva_user
-      POSTGRES_PASSWORD: tamva_pass
+      POSTGRES_DB: ${POSTGRES_DB:-tamva}
+      POSTGRES_USER: ${POSTGRES_USER:-tamva_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tamva_pass}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - tamva_pg_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U tamva_user -d tamva"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tamva_user} -d ${POSTGRES_DB:-tamva}"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -18,7 +18,7 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT:-6379}:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -34,16 +34,20 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    env_file:
+      - .env
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/tamva
-      SPRING_DATASOURCE_USERNAME: tamva_user
-      SPRING_DATASOURCE_PASSWORD: tamva_pass
-      SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      PORT: 8080
+      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL:-jdbc:postgresql://postgres:5432/tamva}
+      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:-tamva_user}
+      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:-tamva_pass}
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: ${SPRING_DATASOURCE_DRIVER_CLASS_NAME:-org.postgresql.Driver}
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      PORT: ${PORT:-8080}
+      TAMVA_JWT_SECRET: ${TAMVA_JWT_SECRET}
+      TAMVA_WEBHOOK_ENCRYPTION_KEY: ${TAMVA_WEBHOOK_ENCRYPTION_KEY}
     ports:
-      - "8080:8080"
+      - "${PORT:-8080}:${PORT:-8080}"
 
 volumes:
   tamva_pg_data:

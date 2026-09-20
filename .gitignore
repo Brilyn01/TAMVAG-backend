@@ -40,3 +40,9 @@ out/
 hs_err_pid*.log
 replay_pid*.log
 error.txt
+*error.txt
+
+### Environment Secrets ###
+.env
+.env*.local
+!.env.example
