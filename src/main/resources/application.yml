@@ -129,6 +129,8 @@ tamva:
   security:
     jwt-secret: ${TAMVA_JWT_SECRET:change-this-development-secret-to-a-long-random-value-2026}
     access-token-ttl-seconds: ${TAMVA_ACCESS_TOKEN_TTL_SECONDS:3600}
+    user-access-token-ttl-seconds: ${TAMVA_USER_ACCESS_TOKEN_TTL_SECONDS:900}
+    refresh-token-ttl-days: ${TAMVA_REFRESH_TOKEN_TTL_DAYS:7}
   kafka:
     enabled: false # Set to true only when a Kafka broker is available
     topics:
