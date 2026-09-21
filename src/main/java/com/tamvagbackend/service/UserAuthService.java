@@ -83,8 +83,15 @@ public class UserAuthService {
 
         TamvaUser user = new TamvaUser();
 
-        user.setCustomerId(savedCustomer.getCustomerId());
+        /*
+         Link the authenticated user to the customer profile
+         created during registration.
+        */
+        user.setCustomer(savedCustomer);
+
         user.setEmail(normalizedEmail);
+
+        
         user.setPasswordHash(passwordEncoder.encode(request.password()));
         user.setFirstName(request.firstName().trim());
         user.setLastName(request.lastName().trim());
@@ -380,32 +387,31 @@ public class UserAuthService {
     }
 
     /**
-      Returns scopes based on the user's assigned application role.
-     
-      Do not derive authorization from client-supplied values.
-     
-      Current mapping:
-     
-      CUSTOMER allowed:
-      - profile:read
-      - profile:write
-      - cases:read
-      - cases:write
-     
-      Other roles allowed:
-      - profile:read
-     */
+         * Returns scopes based on the user's assigned application role.
+         *
+         * Do not derive authorization from client-supplied values.
+         *
+         * CUSTOMER allowed:
+         * - profile:read
+         * - profile:write
+         * - risk:evaluate
+         * - cases:read
+         * - cases:write
+         *
+         * Other roles allowed:
+         * - profile:read
+    */
     private String scopesFor(TamvaUser user) {
         String role = user.getRole() == null
                 ? ""
                 : user.getRole().trim().toUpperCase();
 
         return switch (role) {
-            case "CUSTOMER" ->
-                    "profile:read profile:write cases:read cases:write";
+                case "CUSTOMER" ->
+                        "profile:read profile:write risk:evaluate cases:read cases:write";
 
-            default ->
-                    "profile:read";
+                default ->
+                        "profile:read";
         };
     }
 

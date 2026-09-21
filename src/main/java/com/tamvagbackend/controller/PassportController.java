@@ -1,3 +1,4 @@
+
 package com.tamvagbackend.controller;
 
 import com.tamvagbackend.dto.PassportDtos.CreatePassportRequest;
@@ -10,7 +11,11 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.UUID;
 
@@ -33,19 +38,26 @@ public class PassportController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAuthority('SCOPE_profile:write')")
     @Operation(
             summary = "Create passport",
             description =
-                    "Create a customer-permissioned financial "
-                            + "passport"
+                    "Create a customer-permissioned financial passport"
     )
     public ResponseEntity<PassportResponse> createPassport(
             @Valid
             @RequestBody
-            CreatePassportRequest request
+            CreatePassportRequest request,
+            @AuthenticationPrincipal Jwt jwt
     ) {
+        UUID authenticatedCustomerId =
+                extractAuthenticatedCustomerId(jwt);
+
         PassportResponse response =
-                passportService.createPassport(request);
+                passportService.createPassport(
+                        request,
+                        authenticatedCustomerId
+                );
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
@@ -53,6 +65,7 @@ public class PassportController {
     }
 
     @PostMapping("/{id}/shares")
+    @PreAuthorize("hasAuthority('SCOPE_profile:write')")
     @Operation(
             summary = "Share passport",
             description =
@@ -63,12 +76,17 @@ public class PassportController {
             @PathVariable("id") UUID passportId,
             @Valid
             @RequestBody
-            CreateShareRequest request
+            CreateShareRequest request,
+            @AuthenticationPrincipal Jwt jwt
     ) {
+        UUID authenticatedCustomerId =
+                extractAuthenticatedCustomerId(jwt);
+
         PassportShareResponse response =
                 passportService.createShare(
                         passportId,
-                        request
+                        request,
+                        authenticatedCustomerId
                 );
 
         return ResponseEntity
@@ -77,16 +95,24 @@ public class PassportController {
     }
 
     @DeleteMapping("/shares/{shareId}")
+    @PreAuthorize("hasAuthority('SCOPE_profile:write')")
     @Operation(
             summary = "Revoke passport share",
             description =
                     "Permanently revoke an active passport share"
     )
     public ResponseEntity<PassportShareResponse> revokeShare(
-            @PathVariable("shareId") UUID shareId
+            @PathVariable("shareId") UUID shareId,
+            @AuthenticationPrincipal Jwt jwt
     ) {
+        UUID authenticatedCustomerId =
+                extractAuthenticatedCustomerId(jwt);
+
         return ResponseEntity.ok(
-                passportService.revokeShare(shareId)
+                passportService.revokeShare(
+                        shareId,
+                        authenticatedCustomerId
+                )
         );
     }
 
@@ -103,5 +129,46 @@ public class PassportController {
         return ResponseEntity.ok(
                 passportService.accessPassportByToken(token)
         );
+    }
+
+    private UUID extractAuthenticatedCustomerId(Jwt jwt) {
+        if (jwt == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.UNAUTHORIZED,
+                    "Authentication is required"
+            );
+        }
+
+        String tokenType =
+                jwt.getClaimAsString("token_type");
+
+        if (!"user".equalsIgnoreCase(tokenType)) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "Only authenticated customers can manage passports"
+            );
+        }
+
+        String customerIdClaim =
+                jwt.getClaimAsString("customer_id");
+
+        if (customerIdClaim == null
+                || customerIdClaim.isBlank()) {
+
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "Authenticated user is not linked to a customer profile"
+            );
+        }
+
+        try {
+            return UUID.fromString(customerIdClaim);
+
+        } catch (IllegalArgumentException exception) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "Invalid customer identity in access token"
+            );
+        }
     }
 }

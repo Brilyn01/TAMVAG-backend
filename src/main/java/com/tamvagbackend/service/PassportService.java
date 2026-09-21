@@ -21,6 +21,8 @@ import com.tamvagbackend.dto.ProfileDtos.IncomeSummary;
 import com.tamvagbackend.dto.ProfileDtos.SavingsSummary;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -74,13 +76,24 @@ public class PassportService {
 
     @Transactional
     public PassportResponse createPassport(
-            CreatePassportRequest request
+        CreatePassportRequest request,
+        UUID authenticatedCustomerId
     ) {
         if (request == null) {
             throw new IllegalArgumentException(
                     "Passport request is required"
             );
         }
+        if (authenticatedCustomerId == null) {
+            throw new IllegalArgumentException(
+                    "Authenticated customer ID is required"
+            );
+        }
+
+        requireCustomerOwnership(
+                request.customerId(),
+                authenticatedCustomerId
+        );
 
         Customer customer = customerRepository
                 .findById(request.customerId())
@@ -164,7 +177,8 @@ public class PassportService {
     @Transactional
     public PassportShareResponse createShare(
             UUID passportId,
-            CreateShareRequest request
+            CreateShareRequest request,
+            UUID authenticatedCustomerId
     ) {
         if (passportId == null) {
             throw new IllegalArgumentException(
@@ -186,6 +200,12 @@ public class PassportService {
                                         + passportId
                         )
                 );
+
+
+        requireCustomerOwnership(
+                passport.getCustomer().getCustomerId(),
+                authenticatedCustomerId
+        );
 
         ensurePassportUsable(passport);
 
@@ -273,6 +293,11 @@ public class PassportService {
         PassportShare share =
                 new PassportShare();
 
+        requireCustomerOwnership(
+                share.getPassport().getCustomer().getCustomerId(),
+                authenticatedCustomerId
+        );
+
         share.setPassport(passport);
         share.setRecipient(recipient);
         share.setPurpose(
@@ -316,7 +341,8 @@ public class PassportService {
 
     @Transactional
     public PassportShareResponse revokeShare(
-            UUID shareId
+        UUID shareId,
+        UUID authenticatedCustomerId
     ) {
         if (shareId == null) {
             throw new IllegalArgumentException(
@@ -739,4 +765,24 @@ public class PassportService {
             );
         }
     }
+
+    /**
+     * Ensures that the authenticated customer owns
+     * the passport or passport-related resource.
+   */
+    private void requireCustomerOwnership(
+        UUID resourceCustomerId,
+        UUID authenticatedCustomerId
+    ) {
+        if (resourceCustomerId == null
+                || authenticatedCustomerId == null
+                || !resourceCustomerId.equals(authenticatedCustomerId)) {
+
+                throw new ResponseStatusException(
+                        HttpStatus.FORBIDDEN,
+                        "You can access only your own passport resources"
+                );
+        }
+        }
+
 }

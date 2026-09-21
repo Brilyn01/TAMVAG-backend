@@ -74,6 +74,7 @@ public class AuthenticationService {
                 .issuedAt(issuedAt)
                 .expiresAt(expiresAt)
                 .subject(application.getClientId())
+                .claim("token_type", "institution")
                 .claim("application_id",
                         application.getApplicationId().toString())
                 .claim("institution_id",

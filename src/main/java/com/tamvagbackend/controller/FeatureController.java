@@ -1,3 +1,4 @@
+
 package com.tamvagbackend.controller;
 
 import com.tamvagbackend.domain.entity.FeatureSnapshot;
@@ -5,9 +6,12 @@ import com.tamvagbackend.dto.FeatureDtos;
 import com.tamvagbackend.service.ConsentAuthorizationService;
 import com.tamvagbackend.service.FeatureComputationService;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.UUID;
 
@@ -20,59 +24,177 @@ public class FeatureController {
 
     public FeatureController(
             FeatureComputationService featureComputationService,
-            ConsentAuthorizationService consentAuthorizationService) {
-        this.featureComputationService = featureComputationService;
-        this.consentAuthorizationService = consentAuthorizationService;
+            ConsentAuthorizationService consentAuthorizationService
+    ) {
+        this.featureComputationService =
+                featureComputationService;
+
+        this.consentAuthorizationService =
+                consentAuthorizationService;
     }
 
     @PostMapping("/compute")
     @PreAuthorize("hasAuthority('SCOPE_risk:evaluate')")
     public FeatureDtos.FeatureSnapshotResponse compute(
-            @Valid @RequestBody FeatureDtos.ComputeFeatureRequest request,
-            Authentication authentication) {
+            @Valid
+            @RequestBody
+            FeatureDtos.ComputeFeatureRequest request,
+            Authentication authentication
+    ) {
+        Jwt jwt = extractJwt(authentication);
 
-        UUID institutionId = extractInstitutionId(authentication);
+        String tokenType =
+                jwt.getClaimAsString("token_type");
 
-        /*
-         * Feature computation is derived from customer financial data,
-         * therefore the caller must have active CASH_FLOW consent.
-         */
-        consentAuthorizationService.requireConsent(
-                request.customerId(),
-                institutionId,
-                "CASH_FLOW"
-        );
+        if ("user".equalsIgnoreCase(tokenType)) {
 
-        FeatureSnapshot snapshot =
-                featureComputationService.compute(
-                        request.customerId(),
-                        request.periodStart(),
-                        request.periodEnd()
-                );
+            UUID authenticatedCustomerId =
+                    extractCustomerId(jwt);
 
-        return toResponse(snapshot);
-    }
+            requireCustomerOwnership(
+                    request.customerId(),
+                    authenticatedCustomerId
+            );
 
-    private UUID extractInstitutionId(Authentication authentication) {
+            FeatureSnapshot snapshot =
+                    featureComputationService.compute(
+                            authenticatedCustomerId,
+                            request.periodStart(),
+                            request.periodEnd()
+                    );
 
-        if (authentication.getPrincipal()
-                instanceof org.springframework.security.oauth2.jwt.Jwt jwt) {
-
-            String claim = jwt.getClaimAsString("institution_id");
-
-            if (claim != null && !claim.isBlank()) {
-                return UUID.fromString(claim);
-            }
+            return toResponse(snapshot);
         }
 
-        throw new org.springframework.web.server.ResponseStatusException(
-                org.springframework.http.HttpStatus.UNAUTHORIZED,
-                "Institution context is missing"
+        if ("institution".equalsIgnoreCase(tokenType)) {
+
+            UUID institutionId =
+                    extractInstitutionId(jwt);
+
+            /*
+             * Feature computation is derived from customer
+             * financial data. The institution must have
+             * active CASH_FLOW consent for the customer.
+             */
+            consentAuthorizationService.requireConsent(
+                    request.customerId(),
+                    institutionId,
+                    "CASH_FLOW"
+            );
+
+            FeatureSnapshot snapshot =
+                    featureComputationService.compute(
+                            request.customerId(),
+                            request.periodStart(),
+                            request.periodEnd()
+                    );
+
+            return toResponse(snapshot);
+        }
+
+        throw new ResponseStatusException(
+                HttpStatus.UNAUTHORIZED,
+                "Unsupported or missing token type"
         );
+    }
+
+    private Jwt extractJwt(Authentication authentication) {
+
+        if (authentication == null
+                || authentication.getPrincipal() == null) {
+
+            throw new ResponseStatusException(
+                    HttpStatus.UNAUTHORIZED,
+                    "Authentication is required"
+            );
+        }
+
+        Object principal =
+                authentication.getPrincipal();
+
+        if (principal instanceof Jwt jwt) {
+            return jwt;
+        }
+
+        throw new ResponseStatusException(
+                HttpStatus.UNAUTHORIZED,
+                "Invalid authentication principal"
+        );
+    }
+
+    private UUID extractCustomerId(Jwt jwt) {
+
+        String customerIdClaim =
+                jwt.getClaimAsString("customer_id");
+
+        if (customerIdClaim == null
+                || customerIdClaim.isBlank()) {
+
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "Authenticated user is not linked to a customer profile"
+            );
+        }
+
+        try {
+
+            return UUID.fromString(customerIdClaim);
+
+        } catch (IllegalArgumentException exception) {
+
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "Invalid customer identity in access token"
+            );
+        }
+    }
+
+    private UUID extractInstitutionId(Jwt jwt) {
+
+        String institutionIdClaim =
+                jwt.getClaimAsString("institution_id");
+
+        if (institutionIdClaim == null
+                || institutionIdClaim.isBlank()) {
+
+            throw new ResponseStatusException(
+                    HttpStatus.UNAUTHORIZED,
+                    "Institution context is missing"
+            );
+        }
+
+        try {
+
+            return UUID.fromString(institutionIdClaim);
+
+        } catch (IllegalArgumentException exception) {
+
+            throw new ResponseStatusException(
+                    HttpStatus.UNAUTHORIZED,
+                    "Invalid institution identity in access token"
+            );
+        }
+    }
+
+    private void requireCustomerOwnership(
+            UUID requestedCustomerId,
+            UUID authenticatedCustomerId
+    ) {
+
+        if (requestedCustomerId == null
+                || authenticatedCustomerId == null
+                || !requestedCustomerId.equals(authenticatedCustomerId)) {
+
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "You can access only your own customer features"
+            );
+        }
     }
 
     private FeatureDtos.FeatureSnapshotResponse toResponse(
-            FeatureSnapshot snapshot) {
+            FeatureSnapshot snapshot
+    ) {
 
         return new FeatureDtos.FeatureSnapshotResponse(
                 snapshot.getFeatureSnapshotId(),

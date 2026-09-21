@@ -1,3 +1,4 @@
+
 package com.tamvagbackend.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -12,18 +13,23 @@ import com.tamvagbackend.dto.ConsentDtos.ConsentResponse;
 import com.tamvagbackend.dto.ConsentDtos.CreateConsentRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.*;
+import java.util.Collections;
+import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
 public class ConsentService {
 
-    private static final Logger log = LoggerFactory.getLogger(ConsentService.class);
+    private static final Logger log =
+            LoggerFactory.getLogger(ConsentService.class);
 
     private final ConsentRepository consentRepository;
     private final CustomerRepository customerRepository;
@@ -46,18 +52,46 @@ public class ConsentService {
     }
 
     @Transactional
-    public ConsentResponse createConsent(CreateConsentRequest request) {
-        Customer customer = customerRepository.findById(request.customerId())
-                .orElseThrow(() -> new IllegalArgumentException("Customer not found: " + request.customerId()));
+    public ConsentResponse createConsent(
+            CreateConsentRequest request,
+            UUID authenticatedCustomerId
+    ) {
+        requireCustomerOwnership(
+                request.customerId(),
+                authenticatedCustomerId
+        );
 
-        Institution institution = institutionRepository.findById(request.institutionId())
-                .orElseThrow(() -> new IllegalArgumentException("Institution not found: " + request.institutionId()));
+        Customer customer =
+                customerRepository.findById(authenticatedCustomerId)
+                        .orElseThrow(() ->
+                                new ResponseStatusException(
+                                        HttpStatus.NOT_FOUND,
+                                        "Customer not found"
+                                )
+                        );
 
-        int durationDays = request.durationDays() != null && request.durationDays() > 0 ? request.durationDays() : 90;
+        Institution institution =
+                institutionRepository.findById(request.institutionId())
+                        .orElseThrow(() ->
+                                new ResponseStatusException(
+                                        HttpStatus.NOT_FOUND,
+                                        "Institution not found"
+                                )
+                        );
+
+        int durationDays =
+                request.durationDays() != null
+                        && request.durationDays() > 0
+                        ? request.durationDays()
+                        : 90;
+
         Instant now = Instant.now();
-        Instant expiresAt = now.plus(Duration.ofDays(durationDays));
+
+        Instant expiresAt =
+                now.plus(Duration.ofDays(durationDays));
 
         Consent consent = new Consent();
+
         consent.setCustomer(customer);
         consent.setInstitution(institution);
         consent.setPurpose(request.purpose());
@@ -67,7 +101,8 @@ public class ConsentService {
         consent.setExpiresAt(expiresAt);
         consent.setCreatedAt(now);
 
-        Consent saved = consentRepository.save(consent);
+        Consent saved =
+                consentRepository.save(consent);
 
         auditService.logEvent(
                 "CUSTOMER",
@@ -76,32 +111,81 @@ public class ConsentService {
                 "CONSENT",
                 saved.getConsentId().toString(),
                 null,
-                String.format("Granted consent to %s for purpose '%s'", institution.getName(), request.purpose())
+                String.format(
+                        "Granted consent to %s for purpose '%s'",
+                        institution.getName(),
+                        request.purpose()
+                )
         );
 
         return toResponse(saved);
     }
 
     @Transactional(readOnly = true)
-    public ConsentResponse getConsent(UUID consentId) {
-        Consent consent = consentRepository.findById(consentId)
-                .orElseThrow(() -> new IllegalArgumentException("Consent not found: " + consentId));
+    public ConsentResponse getConsent(
+            UUID consentId,
+            UUID authenticatedCustomerId
+    ) {
+        Consent consent =
+                consentRepository.findById(consentId)
+                        .orElseThrow(() ->
+                                new ResponseStatusException(
+                                        HttpStatus.NOT_FOUND,
+                                        "Consent not found"
+                                )
+                        );
+
+        requireCustomerOwnership(
+                consent.getCustomer().getCustomerId(),
+                authenticatedCustomerId
+        );
+
         return toResponse(consent);
     }
 
     @Transactional(readOnly = true)
-    public List<ConsentResponse> getCustomerConsents(UUID customerId) {
-        Customer customer = customerRepository.findById(customerId)
-                .orElseThrow(() -> new IllegalArgumentException("Customer not found: " + customerId));
-        return consentRepository.findByCustomer(customer).stream()
+    public List<ConsentResponse> getCustomerConsents(
+            UUID customerId,
+            UUID authenticatedCustomerId
+    ) {
+        requireCustomerOwnership(
+                customerId,
+                authenticatedCustomerId
+        );
+
+        Customer customer =
+                customerRepository.findById(authenticatedCustomerId)
+                        .orElseThrow(() ->
+                                new ResponseStatusException(
+                                        HttpStatus.NOT_FOUND,
+                                        "Customer not found"
+                                )
+                        );
+
+        return consentRepository.findByCustomer(customer)
+                .stream()
                 .map(this::toResponse)
                 .collect(Collectors.toList());
     }
 
     @Transactional
-    public ConsentResponse revokeConsent(UUID consentId) {
-        Consent consent = consentRepository.findById(consentId)
-                .orElseThrow(() -> new IllegalArgumentException("Consent not found: " + consentId));
+    public ConsentResponse revokeConsent(
+            UUID consentId,
+            UUID authenticatedCustomerId
+    ) {
+        Consent consent =
+                consentRepository.findById(consentId)
+                        .orElseThrow(() ->
+                                new ResponseStatusException(
+                                        HttpStatus.NOT_FOUND,
+                                        "Consent not found"
+                                )
+                        );
+
+        requireCustomerOwnership(
+                consent.getCustomer().getCustomerId(),
+                authenticatedCustomerId
+        );
 
         if ("REVOKED".equalsIgnoreCase(consent.getStatus())) {
             return toResponse(consent);
@@ -109,7 +193,9 @@ public class ConsentService {
 
         consent.setStatus("REVOKED");
         consent.setRevokedAt(Instant.now());
-        Consent updated = consentRepository.save(consent);
+
+        Consent updated =
+                consentRepository.save(consent);
 
         auditService.logEvent(
                 "CUSTOMER",
@@ -118,14 +204,39 @@ public class ConsentService {
                 "CONSENT",
                 consentId.toString(),
                 null,
-                "Customer revoked consent for institution " + consent.getInstitution().getName()
+                "Customer revoked consent for institution "
+                        + consent.getInstitution().getName()
         );
 
         return toResponse(updated);
     }
 
+    /**
+     * Ensures that the authenticated customer owns
+     * the customer record being accessed.
+     *
+     * This prevents one customer from creating,
+     * viewing, listing, or revoking another customer's consent.
+     */
+    private void requireCustomerOwnership(
+            UUID resourceCustomerId,
+            UUID authenticatedCustomerId
+    ) {
+        if (resourceCustomerId == null
+                || authenticatedCustomerId == null
+                || !resourceCustomerId.equals(authenticatedCustomerId)) {
+
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "You can access only your own customer consent"
+            );
+        }
+    }
+
     private ConsentResponse toResponse(Consent c) {
-        List<String> scopesList = fromJson(c.getScopes());
+        List<String> scopesList =
+                fromJson(c.getScopes());
+
         return new ConsentResponse(
                 c.getConsentId(),
                 c.getCustomer().getCustomerId(),
@@ -144,17 +255,32 @@ public class ConsentService {
     private String toJson(Object obj) {
         try {
             return objectMapper.writeValueAsString(obj);
+
         } catch (JsonProcessingException e) {
+            log.error(
+                    "Failed to serialize consent scopes",
+                    e
+            );
+
             return "[]";
         }
     }
 
     @SuppressWarnings("unchecked")
     private List<String> fromJson(String json) {
-        if (json == null || json.isBlank()) return Collections.emptyList();
+        if (json == null || json.isBlank()) {
+            return Collections.emptyList();
+        }
+
         try {
             return objectMapper.readValue(json, List.class);
+
         } catch (Exception e) {
+            log.error(
+                    "Failed to deserialize consent scopes",
+                    e
+            );
+
             return Collections.emptyList();
         }
     }

@@ -12,8 +12,20 @@ public class TamvaUser {
     @Column(name = "user_id", nullable = false, updatable = false)
     private UUID userId;
 
-    @Column(name = "customer_id")
-    private UUID customerId;
+    /**
+      Each login user is linked to one customer profile.
+     
+      The customer_id column is the foreign-key column
+      linking tamva_user to customer.
+     */
+    @OneToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(
+        name = "customer_id",
+        referencedColumnName = "customer_id",
+        nullable = false,
+        unique = true
+    )
+    private Customer customer;
 
     @Column(name = "email", nullable = false, unique = true)
     private String email;
@@ -46,36 +58,109 @@ public class TamvaUser {
         this.userId = UUID.randomUUID();
     }
 
-    public UUID getUserId()                        { return userId; }
-    public void setUserId(UUID userId)             { this.userId = userId; }
+    public UUID getUserId() {
+        return userId;
+    }
 
-    public UUID getCustomerId()                    { return customerId; }
-    public void setCustomerId(UUID customerId)     { this.customerId = customerId; }
+    public void setUserId(UUID userId) {
+        this.userId = userId;
+    }
 
-    public String getEmail()                       { return email; }
-    public void setEmail(String email)             { this.email = email; }
+    /**
+     * Returns the linked customer entity.
+    */
+    public Customer getCustomer() {
+        return customer;
+    }
 
-    public String getPasswordHash()                { return passwordHash; }
-    public void setPasswordHash(String hash)       { this.passwordHash = hash; }
+    /**
+    *  Assigns the customer profile to this user.
+    */
+    public void setCustomer(Customer customer) {
+        this.customer = customer;
+    }
 
-    public String getFirstName()                   { return firstName; }
-    public void setFirstName(String firstName)     { this.firstName = firstName; }
+    /**
+      Convenience method for existing service and DTO code.
+     
+     * Returns the ID of the linked customer.
+     */
+    @Transient
+    public UUID getCustomerId() {
+        return customer != null
+                ? customer.getCustomerId()
+                : null;
+    }
 
-    public String getLastName()                    { return lastName; }
-    public void setLastName(String lastName)       { this.lastName = lastName; }
+    public String getEmail() {
+        return email;
+    }
 
-    public String getPhoneNumber()                 { return phoneNumber; }
-    public void setPhoneNumber(String phoneNumber) { this.phoneNumber = phoneNumber; }
+    public void setEmail(String email) {
+        this.email = email;
+    }
 
-    public String getRole()                        { return role; }
-    public void setRole(String role)               { this.role = role; }
+    public String getPasswordHash() {
+        return passwordHash;
+    }
 
-    public String getStatus()                      { return status; }
-    public void setStatus(String status)           { this.status = status; }
+    public void setPasswordHash(String passwordHash) {
+        this.passwordHash = passwordHash;
+    }
 
-    public Instant getCreatedAt()                  { return createdAt; }
-    public void setCreatedAt(Instant createdAt)    { this.createdAt = createdAt; }
+    public String getFirstName() {
+        return firstName;
+    }
 
-    public Instant getUpdatedAt()                  { return updatedAt; }
-    public void setUpdatedAt(Instant updatedAt)    { this.updatedAt = updatedAt; }
+    public void setFirstName(String firstName) {
+        this.firstName = firstName;
+    }
+
+    public String getLastName() {
+        return lastName;
+    }
+
+    public void setLastName(String lastName) {
+        this.lastName = lastName;
+    }
+
+    public String getPhoneNumber() {
+        return phoneNumber;
+    }
+
+    public void setPhoneNumber(String phoneNumber) {
+        this.phoneNumber = phoneNumber;
+    }
+
+    public String getRole() {
+        return role;
+    }
+
+    public void setRole(String role) {
+        this.role = role;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(Instant createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public Instant getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(Instant updatedAt) {
+        this.updatedAt = updatedAt;
+    }
 }
