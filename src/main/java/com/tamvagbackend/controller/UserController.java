@@ -34,8 +34,12 @@ public class UserController {
             description = "Creates a login identity and associated customer profile",
             security = {}
     )
-    public ResponseEntity<SignUpResponse> signup(@Valid @RequestBody SignUpRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(userAuthService.signUp(request));
+    public ResponseEntity<SignUpResponse> signup(
+            @Valid @RequestBody SignUpRequest request
+    ) {
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(userAuthService.signUp(request));
     }
 
     @PostMapping("/signin")
@@ -44,8 +48,12 @@ public class UserController {
             description = "Authenticates an existing user and returns access and refresh tokens",
             security = {}
     )
-    public ResponseEntity<SignInResponse> signin(@Valid @RequestBody SignInRequest request) {
-        return ResponseEntity.ok(userAuthService.signIn(request));
+    public ResponseEntity<SignInResponse> signin(
+            @Valid @RequestBody SignInRequest request
+    ) {
+        return ResponseEntity.ok(
+                userAuthService.signIn(request)
+        );
     }
 
     @PostMapping("/refresh")
@@ -54,8 +62,12 @@ public class UserController {
             description = "Exchanges a valid refresh token for a new access token and rotated refresh token",
             security = {}
     )
-    public ResponseEntity<RefreshResponse> refresh(@Valid @RequestBody RefreshRequest request) {
-        return ResponseEntity.ok(userAuthService.refresh(request));
+    public ResponseEntity<RefreshResponse> refresh(
+            @Valid @RequestBody RefreshRequest request
+    ) {
+        return ResponseEntity.ok(
+                userAuthService.refresh(request)
+        );
     }
 
     @PostMapping("/logout")
@@ -67,9 +79,20 @@ public class UserController {
             @RequestBody(required = false) LogoutRequest request,
             @AuthenticationPrincipal Jwt jwt
     ) {
-        UUID userId = jwt != null ? UUID.fromString(jwt.getSubject()) : null;
-        String refreshToken = request != null ? request.refreshToken() : null;
-        return ResponseEntity.ok(userAuthService.logout(refreshToken, userId));
+        UUID userId = jwt != null
+                ? UUID.fromString(jwt.getSubject())
+                : null;
+
+        String refreshToken = request != null
+                ? request.refreshToken()
+                : null;
+
+        return ResponseEntity.ok(
+                userAuthService.logout(
+                        refreshToken,
+                        userId
+                )
+        );
     }
 
     @GetMapping("/me")
@@ -78,13 +101,20 @@ public class UserController {
             summary = "Get current user profile",
             description = "Returns the authenticated user's profile and linked customer information"
     )
-    public ResponseEntity<UserMeResponse> me(@AuthenticationPrincipal Jwt jwt) {
-        UUID userId = UUID.fromString(jwt.getSubject());
-        return ResponseEntity.ok(userAuthService.getMe(userId));
+    public ResponseEntity<UserMeResponse> me(
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        UUID userId = UUID.fromString(
+                jwt.getSubject()
+        );
+
+        return ResponseEntity.ok(
+                userAuthService.getMe(userId)
+        );
     }
 
     @PatchMapping("/me")
-    @PreAuthorize("hasAuthority('SCOPE_profile:read')")
+    @PreAuthorize("hasAuthority('SCOPE_profile:write')")
     @Operation(
             summary = "Update current user profile",
             description = "Updates permitted profile fields (first name, last name, phone number) for the authenticated user"
@@ -93,7 +123,15 @@ public class UserController {
             @AuthenticationPrincipal Jwt jwt,
             @RequestBody UpdateMeRequest request
     ) {
-        UUID userId = UUID.fromString(jwt.getSubject());
-        return ResponseEntity.ok(userAuthService.updateMe(userId, request));
+        UUID userId = UUID.fromString(
+                jwt.getSubject()
+        );
+
+        return ResponseEntity.ok(
+                userAuthService.updateMe(
+                        userId,
+                        request
+                )
+        );
     }
 }
