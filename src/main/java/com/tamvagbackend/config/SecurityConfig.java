@@ -90,6 +90,10 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
                                 "/v1/auth/token",
+                                "/v1/users/signup",
+                                "/v1/users/signin",
+                                "/v1/users/refresh",
+                                "/v1/users/logout",
                                 "/v1/health",
                                 "/actuator/health",
                                 "/swagger-ui/**",
