@@ -1,3 +1,4 @@
+
 package com.tamvagbackend.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -16,6 +17,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -23,6 +25,12 @@ import java.util.UUID;
 public class ApplicationService {
 
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+
+    private static final Set<String> FORBIDDEN_APPLICATION_SCOPES = Set.of(
+            "cases:read",
+            "cases:write",
+            "cases:create"
+    );
 
     private final ApplicationRepository applicationRepository;
     private final InstitutionRepository institutionRepository;
@@ -72,7 +80,12 @@ public class ApplicationService {
         application.setClientSecretHash(
                 passwordEncoder.encode(clientSecret)
         );
-        application.setScopes(serializeScopes(request.scopes()));
+
+        application.setScopes(
+                serializeScopes(
+                        validateApplicationScopes(request.scopes())
+                )
+        );
 
         Application saved = applicationRepository.save(application);
 
@@ -87,12 +100,18 @@ public class ApplicationService {
             UUID applicationId,
             UUID callerInstitutionId
     ) {
-        Application application = findApplication(applicationId, callerInstitutionId);
+        Application application = findApplication(
+                applicationId,
+                callerInstitutionId
+        );
+
         return toResponse(application);
     }
 
     @Transactional(readOnly = true)
-    public List<ApplicationDtos.ApplicationResponse> list(UUID callerInstitutionId) {
+    public List<ApplicationDtos.ApplicationResponse> list(
+            UUID callerInstitutionId
+    ) {
         return applicationRepository
                 .findByInstitution_InstitutionId(callerInstitutionId)
                 .stream()
@@ -105,9 +124,14 @@ public class ApplicationService {
             UUID callerInstitutionId,
             ApplicationDtos.UpdateStatusRequest request
     ) {
-        Application application = findApplication(applicationId, callerInstitutionId);
+        Application application = findApplication(
+                applicationId,
+                callerInstitutionId
+        );
 
-        String status = request.status().trim().toUpperCase();
+        String status = request.status()
+                .trim()
+                .toUpperCase();
 
         if (!List.of("ACTIVE", "INACTIVE").contains(status)) {
             throw new ResponseStatusException(
@@ -118,7 +142,9 @@ public class ApplicationService {
 
         application.setStatus(status);
 
-        return toResponse(applicationRepository.save(application));
+        return toResponse(
+                applicationRepository.save(application)
+        );
     }
 
     public ApplicationDtos.ApplicationResponse updateScopes(
@@ -126,20 +152,32 @@ public class ApplicationService {
             UUID callerInstitutionId,
             ApplicationDtos.UpdateScopesRequest request
     ) {
-        Application application = findApplication(applicationId, callerInstitutionId);
+        Application application = findApplication(
+                applicationId,
+                callerInstitutionId
+        );
 
-        List<String> scopes = normalizeScopes(request.scopes());
+        List<String> scopes = validateApplicationScopes(
+                request.scopes()
+        );
 
-        application.setScopes(serializeScopes(scopes));
+        application.setScopes(
+                serializeScopes(scopes)
+        );
 
-        return toResponse(applicationRepository.save(application));
+        return toResponse(
+                applicationRepository.save(application)
+        );
     }
 
     public ApplicationDtos.RotateSecretResponse rotateSecret(
             UUID applicationId,
             UUID callerInstitutionId
     ) {
-        Application application = findApplication(applicationId, callerInstitutionId);
+        Application application = findApplication(
+                applicationId,
+                callerInstitutionId
+        );
 
         String clientSecret = generateClientSecret();
 
@@ -160,9 +198,11 @@ public class ApplicationService {
             UUID applicationId,
             UUID callerInstitutionId
     ) {
-        // 404 rather than 403 on a cross-institution ID so callers can't
-        // use this endpoint to enumerate whether an applicationId exists
-        // under a different institution.
+        /*
+         * Return 404 rather than 403 on a cross-institution ID
+         * so callers cannot use this endpoint to enumerate
+         * whether an application ID exists under another institution.
+         */
         return applicationRepository
                 .findByApplicationIdAndInstitution_InstitutionId(
                         applicationId,
@@ -188,7 +228,28 @@ public class ApplicationService {
         );
     }
 
-    private List<String> normalizeScopes(List<String> scopes) {
+    private List<String> validateApplicationScopes(
+            List<String> scopes
+    ) {
+        List<String> normalizedScopes = normalizeScopes(scopes);
+
+        List<String> forbiddenScopes = normalizedScopes.stream()
+                .filter(FORBIDDEN_APPLICATION_SCOPES::contains)
+                .toList();
+
+        if (!forbiddenScopes.isEmpty()) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "Case scopes cannot be assigned to institution applications"
+            );
+        }
+
+        return normalizedScopes;
+    }
+
+    private List<String> normalizeScopes(
+            List<String> scopes
+    ) {
         return scopes.stream()
                 .map(String::trim)
                 .filter(scope -> !scope.isBlank())
@@ -196,7 +257,9 @@ public class ApplicationService {
                 .toList();
     }
 
-    private String serializeScopes(List<String> scopes) {
+    private String serializeScopes(
+            List<String> scopes
+    ) {
         try {
             return objectMapper.writeValueAsString(
                     normalizeScopes(scopes)
@@ -209,7 +272,9 @@ public class ApplicationService {
         }
     }
 
-    private List<String> parseScopes(String scopes) {
+    private List<String> parseScopes(
+            String scopes
+    ) {
         if (scopes == null || scopes.isBlank()) {
             return List.of();
         }
@@ -218,7 +283,10 @@ public class ApplicationService {
             return objectMapper.readValue(
                     scopes,
                     objectMapper.getTypeFactory()
-                            .constructCollectionType(List.class, String.class)
+                            .constructCollectionType(
+                                    List.class,
+                                    String.class
+                            )
             );
         } catch (JsonProcessingException e) {
             throw new IllegalStateException(
@@ -235,7 +303,9 @@ public class ApplicationService {
                             .toString()
                             .replace("-", "");
 
-            if (applicationRepository.findByClientId(clientId).isEmpty()) {
+            if (applicationRepository
+                    .findByClientId(clientId)
+                    .isEmpty()) {
                 return clientId;
             }
         }
@@ -247,6 +317,7 @@ public class ApplicationService {
 
     private String generateClientSecret() {
         byte[] secret = new byte[32];
+
         SECURE_RANDOM.nextBytes(secret);
 
         return Base64.getUrlEncoder()

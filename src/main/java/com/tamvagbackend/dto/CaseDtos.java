@@ -14,13 +14,45 @@ public final class CaseDtos {
     private CaseDtos() {
     }
 
+    public record CreateManualCaseRequest(
+
+            @NotBlank(message = "title is required")
+            @Size(max = 255, message = "title must not exceed 255 characters")
+            String title,
+
+            @Size(max = 5000, message = "description must not exceed 5000 characters")
+            String description,
+
+            @Pattern(
+                    regexp = "LOW|MEDIUM|HIGH|CRITICAL",
+                    message = "severity must be one of LOW, MEDIUM, HIGH, CRITICAL"
+            )
+            String severity,
+
+            @Pattern(
+                    regexp = "LOW|NORMAL|HIGH|URGENT",
+                    message = "priority must be one of LOW, NORMAL, HIGH, URGENT"
+            )
+            String priority,
+
+            UUID customerId
+    ) {
+    }
+
     public record CaseActionRequest(
 
             @NotBlank(message = "action is required")
             @Schema(
                     description = "Analyst action",
                     example = "INVESTIGATE",
-                    allowableValues = {"CHALLENGE", "HOLD", "RELEASE", "ESCALATE", "BLOCK", "INVESTIGATE"}
+                    allowableValues = {
+                            "CHALLENGE",
+                            "HOLD",
+                            "RELEASE",
+                            "ESCALATE",
+                            "BLOCK",
+                            "INVESTIGATE"
+                    }
             )
             @Pattern(
                     regexp = "CHALLENGE|HOLD|RELEASE|ESCALATE|BLOCK|INVESTIGATE",
@@ -32,24 +64,11 @@ public final class CaseDtos {
                     regexp = "CONFIRMED_RISK|FALSE_POSITIVE|CUSTOMER_CONFIRMED|OTHER",
                     message = "disposition must be one of CONFIRMED_RISK, FALSE_POSITIVE, CUSTOMER_CONFIRMED, OTHER"
             )
-            @Schema(
-                    description = "Case disposition",
-                    example = "OTHER",
-                    allowableValues = {"CONFIRMED_RISK", "FALSE_POSITIVE", "CUSTOMER_CONFIRMED", "OTHER"}
-            )
             String disposition,
 
-            @Schema(
-                    description = "Analyst assignee",
-                    example = "gcb-risk-analyst"
-            )
             @Size(max = 100, message = "assignee must not exceed 100 characters")
             String assignee,
 
-            @Schema(
-                    description = "Analyst note appended to the case history",
-                    example = "Investigating the transaction pattern before release."
-            )
             @Size(max = 5000, message = "notes must not exceed 5000 characters")
             String notes
     ) {
@@ -60,6 +79,12 @@ public final class CaseDtos {
             @JsonProperty("case_id")
             UUID caseId,
 
+            @JsonProperty("case_type")
+            String caseType,
+
+            @JsonProperty("institution_id")
+            UUID institutionId,
+
             @JsonProperty("risk_event_id")
             UUID riskEventId,
 
@@ -67,12 +92,18 @@ public final class CaseDtos {
             UUID customerId,
 
             @JsonProperty("risk_score")
-            int riskScore,
+            Integer riskScore,
 
             @JsonProperty("risk_decision")
             String riskDecision,
 
+            String title,
+
+            String description,
+
             String severity,
+
+            String priority,
 
             String status,
 
@@ -80,7 +111,12 @@ public final class CaseDtos {
 
             String assignee,
 
+            @JsonProperty("created_by")
+            String createdBy,
+
             String disposition,
+
+            String resolution,
 
             String notes,
 
@@ -88,7 +124,10 @@ public final class CaseDtos {
             Instant createdAt,
 
             @JsonProperty("updated_at")
-            Instant updatedAt
+            Instant updatedAt,
+
+            @JsonProperty("resolved_at")
+            Instant resolvedAt
     ) {
     }
 }

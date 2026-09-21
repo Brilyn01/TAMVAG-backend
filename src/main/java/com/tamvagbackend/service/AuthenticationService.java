@@ -10,7 +10,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
-import org.springframework.security.oauth2.jwt.JwsHeader;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,29 +44,62 @@ public class AuthenticationService {
     @Transactional(readOnly = true)
     public TokenResponse authenticate(TokenRequest request) {
 
+        if (request == null
+                || request.clientId() == null
+                || request.clientId().isBlank()
+                || request.clientSecret() == null
+                || request.clientSecret().isBlank()) {
+
+            throw new BadCredentialsException(
+                    "Invalid client credentials"
+            );
+        }
+
         Application application = applicationRepository
                 .findByClientId(request.clientId())
                 .orElseThrow(() ->
-                        new BadCredentialsException("Invalid client credentials")
+                        new BadCredentialsException(
+                                "Invalid client credentials"
+                        )
                 );
 
         if (!"ACTIVE".equalsIgnoreCase(application.getStatus())) {
-            throw new BadCredentialsException("Application is inactive");
+            throw new BadCredentialsException(
+                    "Application is inactive"
+            );
         }
 
-        if (application.getClientSecretHash() == null ||
-                !passwordEncoder.matches(
+        if (application.getClientSecretHash() == null
+                || !passwordEncoder.matches(
                         request.clientSecret(),
                         application.getClientSecretHash()
                 )) {
 
-            throw new BadCredentialsException("Invalid client credentials");
+            throw new BadCredentialsException(
+                    "Invalid client credentials"
+            );
         }
 
-        List<String> scopes = parseScopes(application.getScopes());
+        if (application.getInstitution() == null
+                || application.getInstitution().getInstitutionId() == null) {
+
+            throw new IllegalStateException(
+                    "Application is not associated with an institution"
+            );
+        }
+
+        List<String> scopes = parseScopes(
+                application.getScopes()
+        );
 
         Instant issuedAt = Instant.now();
-        Instant expiresAt = issuedAt.plusSeconds(accessTokenTtlSeconds);
+        Instant expiresAt = issuedAt.plusSeconds(
+                accessTokenTtlSeconds
+        );
+
+        String institutionId = application.getInstitution()
+                .getInstitutionId()
+                .toString();
 
         JwtClaimsSet claims = JwtClaimsSet.builder()
                 .issuer("tamva")
@@ -75,11 +107,18 @@ public class AuthenticationService {
                 .expiresAt(expiresAt)
                 .subject(application.getClientId())
                 .claim("token_type", "institution")
-                .claim("application_id",
-                        application.getApplicationId().toString())
-                .claim("institution_id",
-                        application.getInstitution().getInstitutionId().toString())
-                .claim("scope", String.join(" ", scopes))
+                .claim(
+                        "application_id",
+                        application.getApplicationId().toString()
+                )
+                .claim(
+                        "institution_id",
+                        institutionId
+                )
+                .claim(
+                        "scope",
+                        String.join(" ", scopes)
+                )
                 .build();
 
         String accessToken = jwtEncoder

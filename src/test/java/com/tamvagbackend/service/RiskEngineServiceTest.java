@@ -1,10 +1,11 @@
 package com.tamvagbackend.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.tamvagbackend.domain.entity.Account;
 import com.tamvagbackend.domain.entity.Customer;
+import com.tamvagbackend.domain.entity.Institution;
 import com.tamvagbackend.domain.entity.RiskEvent;
 import com.tamvagbackend.domain.repository.AccountRepository;
-import com.tamvagbackend.service.AuditService;
 import com.tamvagbackend.domain.repository.BeneficiaryRepository;
 import com.tamvagbackend.domain.repository.CaseRecordRepository;
 import com.tamvagbackend.domain.repository.CustomerRepository;
@@ -70,10 +71,15 @@ class RiskEngineServiceTest {
 
     private Customer testCustomer;
     private UUID customerId;
+    private Account testAccount;
+    private UUID accountId;
+    private UUID institutionId;
 
     @BeforeEach
     void setUp() {
         customerId = UUID.randomUUID();
+        accountId = UUID.randomUUID();
+        institutionId = UUID.randomUUID();
 
         testCustomer = new Customer(
                 customerId,
@@ -81,6 +87,22 @@ class RiskEngineServiceTest {
                 "INDIVIDUAL",
                 "ACTIVE"
         );
+
+        Institution testInstitution = new Institution(
+                institutionId,
+                "GCB Bank",
+                "BANK",
+                "ACTIVE",
+                null
+        );
+
+        testAccount = new Account();
+        testAccount.setAccountId(accountId);
+        testAccount.setCustomer(testCustomer);
+        testAccount.setInstitution(testInstitution);
+        testAccount.setAccountType("MOBILE_MONEY");
+        testAccount.setCurrency("GHS");
+        testAccount.setStatus("ACTIVE");
 
         ReflectionTestUtils.setField(
                 riskEngineService,
@@ -93,6 +115,9 @@ class RiskEngineServiceTest {
     void testEvaluateTransaction_NewDeviceAndNewBeneficiary() throws Exception {
         when(customerRepository.findById(customerId))
                 .thenReturn(Optional.of(testCustomer));
+
+        when(accountRepository.findById(accountId))
+                .thenReturn(Optional.of(testAccount));
 
         ConfigurableRiskRulesEngine.RuleEvaluation ruleEvaluation =
                 new ConfigurableRiskRulesEngine.RuleEvaluation(
@@ -155,7 +180,7 @@ class RiskEngineServiceTest {
 
         RiskEvaluationRequest request = new RiskEvaluationRequest(
                 customerId,
-                null,
+                accountId,
                 new BigDecimal("8500.00"),
                 "GHS",
                 new DestinationInfo(
