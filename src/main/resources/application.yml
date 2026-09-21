@@ -10,8 +10,8 @@ spring:
       - org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:h2:mem:tamvadb;DB_CLOSE_DELAY=-1;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH}
-    username: ${SPRING_DATASOURCE_USERNAME:sa}
-    password: ${SPRING_DATASOURCE_PASSWORD:}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
     driver-class-name: ${SPRING_DATASOURCE_DRIVER_CLASS_NAME:org.h2.Driver}
     hikari:
       maximum-pool-size: 10
@@ -36,18 +36,18 @@ spring:
   # Redis Configuration
   data:
     redis:
-      url: ${REDIS_URL:}
-      host: ${REDIS_HOST:localhost}
-      port: ${REDIS_PORT:6379}
+      url: ${REDIS_URL}
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT}
       timeout: 2000ms
 
   # Kafka Configuration for Async Transaction Ingestion
   kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
     properties:
       # Upstash Kafka SASL/SSL (no-op locally when KAFKA_SASL_USERNAME is empty)
-      security.protocol: ${KAFKA_SECURITY_PROTOCOL:PLAINTEXT}
-      sasl.mechanism: ${KAFKA_SASL_MECHANISM:PLAIN}
+      security.protocol: ${KAFKA_SECURITY_PROTOCOL}
+      sasl.mechanism: ${KAFKA_SASL_MECHANISM}
       sasl.jaas.config: >
         ${KAFKA_SASL_JAAS_CONFIG:org.apache.kafka.common.security.plain.PlainLoginModule required username="" password="";}
     consumer:
@@ -83,7 +83,7 @@ springdoc:
 
 tamva:
   risk:
-    ruleset-version: ${TAMVA_RULESET_VERSION:rules-2026.09.1}
+    ruleset-version: ${TAMVA_RULESET_VERSION}
 
     new-device:
       code: R001
@@ -127,8 +127,8 @@ tamva:
   model-version: fraud-v3.2
   default-currency: GHS
   security:
-    jwt-secret: ${TAMVA_JWT_SECRET:change-this-development-secret-to-a-long-random-value-2026}
-    access-token-ttl-seconds: ${TAMVA_ACCESS_TOKEN_TTL_SECONDS:3600}
+    jwt-secret: ${TAMVA_JWT_SECRET}
+    access-token-ttl-seconds: ${TAMVA_ACCESS_TOKEN_TTL_SECONDS}
   kafka:
     enabled: false # Set to true only when a Kafka broker is available
     topics:
@@ -136,9 +136,9 @@ tamva:
       transaction-normalised: tamva.transaction.normalised
       transaction-dlq: tamva.transaction.dlq
   webhook:
-    encryption-key: ${TAMVA_WEBHOOK_ENCRYPTION_KEY:change-this-development-webhook-encryption-key-32chars}
-    max-attempts: ${TAMVA_WEBHOOK_MAX_ATTEMPTS:8}
-    initial-retry-seconds: ${TAMVA_WEBHOOK_INITIAL_RETRY_SECONDS:30}
-    max-retry-seconds: ${TAMVA_WEBHOOK_MAX_RETRY_SECONDS:3600}
-    stale-delivery-seconds: ${TAMVA_WEBHOOK_STALE_DELIVERY_SECONDS:120}
-    poll-interval-ms: ${TAMVA_WEBHOOK_POLL_INTERVAL_MS:5000}
+    encryption-key: ${TAMVA_WEBHOOK_ENCRYPTION_KEY}
+    max-attempts: ${TAMVA_WEBHOOK_MAX_ATTEMPTS}
+    initial-retry-seconds: ${TAMVA_WEBHOOK_INITIAL_RETRY_SECONDS}
+    max-retry-seconds: ${TAMVA_WEBHOOK_MAX_RETRY_SECONDS}
+    stale-delivery-seconds: ${TAMVA_WEBHOOK_STALE_DELIVERY_SECONDS}
+    poll-interval-ms: ${TAMVA_WEBHOOK_POLL_INTERVAL_MS}

@@ -18,8 +18,8 @@ public final class AuthDtos {
 
             @NotBlank
             @Schema(
-                    description = "Seeded GCB pilot client secret",
-                    example = "gcb-pilot-secret-2026",
+                    description = "GCB pilot client secret configured in the deployment environment",
+                    example = "your-client-secret",
                     format = "password"
             )
             String clientSecret

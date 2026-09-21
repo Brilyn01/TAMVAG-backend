@@ -35,7 +35,7 @@ public class OpenApiConfig {
                                 Kwame customer = a1b2c3d4-0000-0000-0000-000000000001
                                 Abena customer = a1b2c3d4-0000-0000-0000-000000000002
                                 Pilot client ID = app_gcb_pilot_2026
-                                Pilot client secret = gcb-pilot-secret-2026
+                                Pilot client secret = Configured the client secret through the deployment environment
 
                                 IDs generated at runtime, such as application_id,
                                 account_id, connection_id, case_id and passport_id,

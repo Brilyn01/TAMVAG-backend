@@ -33,6 +33,8 @@ class AuthControllerTest {
     @MockBean
     private AuthenticationService authenticationService;
 
+    String seedClientSecret = System.getenv("TAMVA_SEED_CLIENT_SECRET");
+
     @Test
     void validCredentialsReturnAccessToken() throws Exception {
         when(authenticationService.authenticate(any()))
@@ -52,9 +54,9 @@ class AuthControllerTest {
                         .content("""
                                 {
                                   "clientId": "app_gcb_pilot_2026",
-                                  "clientSecret": "gcb-pilot-secret-2026"
+                                  "clientSecret": "%s"
                                 }
-                                """)
+                                """.formatted(seedClientSecret))
         )
         .andExpect(status().isOk())
         .andExpect(header().string(

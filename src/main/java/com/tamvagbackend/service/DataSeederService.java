@@ -74,11 +74,13 @@ public class DataSeederService implements CommandLineRunner {
 
         // 2. Seed Partner Application
 
-        String seedClientSecret =
-            System.getenv().getOrDefault(
-                    "TAMVA_SEED_CLIENT_SECRET",
-                    "gcb-pilot-secret-2026"
+        String seedClientSecret = System.getenv("TAMVA_SEED_CLIENT_SECRET");
+
+        if (seedClientSecret == null || seedClientSecret.isBlank()) {
+            throw new IllegalStateException(
+                    "TAMVA_SEED_CLIENT_SECRET must be configured"
             );
+        }
 
         Application partnerApp = new Application();
         partnerApp.setInstitution(gcb);

@@ -1,5 +1,5 @@
 -- V7 set client_secret_hash to a bcrypt hash that does not correspond
--- to the documented pilot secret ("gcb-pilot-secret-2026"), locking out
+-- to the documented pilot secret ("TAMVA_SEED_CLIENT_SECRET"), locking out
 -- the GCB pilot client. Correct it here rather than editing the already
 -- applied V7/V8 (which would break Flyway checksum validation).
 
