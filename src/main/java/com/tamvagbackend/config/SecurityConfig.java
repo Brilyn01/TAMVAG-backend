@@ -92,6 +92,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
                                 "/v1/auth/token",
+                                "/v1/admin/auth/login",
                                 "/v1/users/signup",
                                 "/v1/users/signin",
                                 "/v1/users/refresh",

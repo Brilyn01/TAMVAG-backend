@@ -71,15 +71,33 @@ public class TokenTypeAuthenticationConverter
                     validateUserToken(jwt);
 
             case ADMIN_TOKEN ->
-                    throw new BadCredentialsException(
-                            "Admin authentication is not implemented"
-                    );
+                    validateAdminToken(jwt);
 
             default ->
                     throw new BadCredentialsException(
                             "Unsupported token type"
                     );
         }
+    }
+
+    private void validateAdminToken(Jwt jwt) {
+        requireClaim(
+                jwt,
+                "admin_user_id",
+                "Admin token requires admin_user_id"
+        );
+
+        requireClaim(
+                jwt,
+                "role",
+                "Admin token requires role"
+        );
+
+        requireClaim(
+                jwt,
+                "operational_role",
+                "Admin token requires operational_role"
+        );
     }
 
     private void validateInstitutionToken(Jwt jwt) {
