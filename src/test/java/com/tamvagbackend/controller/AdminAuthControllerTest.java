@@ -2,18 +2,22 @@ package com.tamvagbackend.controller;
 
 import com.tamvagbackend.config.SecurityConfig;
 import com.tamvagbackend.dto.AdminAuthDtos.AdminLoginResponse;
+import com.tamvagbackend.dto.AdminAuthDtos.AdminProvisionResponse;
 import com.tamvagbackend.dto.AdminAuthDtos.AdminUserInfo;
 import com.tamvagbackend.exception.GlobalExceptionHandler;
 import com.tamvagbackend.exception.SecurityExceptionHandler;
 import com.tamvagbackend.service.AdminAuthenticationService;
+import com.tamvagbackend.service.AdminProvisioningService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Set;
 import java.util.UUID;
@@ -37,6 +41,11 @@ class AdminAuthControllerTest {
 
     @MockBean
     private AdminAuthenticationService adminAuthenticationService;
+
+    @MockBean
+    private AdminProvisioningService adminProvisioningService;
+
+    // ── Login Tests ──────────────────────────────────────────────────────
 
     @Test
     void validCredentialsReturnAdminToken() throws Exception {
@@ -84,4 +93,81 @@ class AdminAuthControllerTest {
         )
         .andExpect(status().isUnauthorized());
     }
+
+    // ── Signup Tests ─────────────────────────────────────────────────────
+
+    @Test
+    void validSignupReturnsCreated() throws Exception {
+        UUID adminId = UUID.randomUUID();
+        when(adminProvisioningService.provisionAdmin(any())).thenReturn(
+                new AdminProvisionResponse(
+                        adminId,
+                        "newadmin@tamva.com",
+                        "Kofi",
+                        "Annan",
+                        "ADMIN",
+                        "RISK_ANALYST",
+                        "ACTIVE",
+                        "Admin account provisioned successfully"
+                )
+        );
+
+        mockMvc.perform(
+                post("/v1/admin/auth/signup")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "email": "newadmin@tamva.com",
+                                  "password": "AdminPassword!2026",
+                                  "firstName": "Kofi",
+                                  "lastName": "Annan",
+                                  "role": "ADMIN",
+                                  "operationalRole": "RISK_ANALYST"
+                                }
+                                """)
+        )
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.adminUserId").value(adminId.toString()))
+        .andExpect(jsonPath("$.email").value("newadmin@tamva.com"))
+        .andExpect(jsonPath("$.firstName").value("Kofi"))
+        .andExpect(jsonPath("$.role").value("ADMIN"))
+        .andExpect(jsonPath("$.message").value("Admin account provisioned successfully"));
+    }
+
+    @Test
+    void duplicateEmailSignupReturnsConflict() throws Exception {
+        when(adminProvisioningService.provisionAdmin(any()))
+                .thenThrow(new ResponseStatusException(HttpStatus.CONFLICT, "An admin account with this email already exists"));
+
+        mockMvc.perform(
+                post("/v1/admin/auth/signup")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "email": "existing@tamva.com",
+                                  "password": "AdminPassword!2026",
+                                  "firstName": "Kofi",
+                                  "lastName": "Annan",
+                                  "role": "ADMIN",
+                                  "operationalRole": "RISK_ANALYST"
+                                }
+                                """)
+        )
+        .andExpect(status().isConflict());
+    }
+
+    @Test
+    void signupWithMissingFieldsReturnsBadRequest() throws Exception {
+        mockMvc.perform(
+                post("/v1/admin/auth/signup")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "email": "newadmin@tamva.com"
+                                }
+                                """)
+        )
+        .andExpect(status().isBadRequest());
+    }
 }
+
