@@ -56,4 +56,24 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
+    environment 'TAMVA_DB_URL', 'jdbc:postgresql://localhost:5432/tamva'
+    environment 'SPRING_DATASOURCE_URL', 'jdbc:postgresql://localhost:5432/tamva'
+    environment 'SPRING_DATASOURCE_USERNAME', 'tamva_user'
+    environment 'SPRING_DATASOURCE_PASSWORD', 'tamva_pass'
+    environment 'SPRING_DATASOURCE_DRIVER_CLASS_NAME', 'org.postgresql.Driver'
+    environment 'TAMVA_SEED_CLIENT_SECRET', 'gcb-pilot-secret-2026'
+    environment 'TAMVA_TEST_JWT_SECRET', 'test-jwt-secret-2026-for-local-integration-testing-32chars!'
+    environment 'TAMVA_JWT_SECRET', 'change-this-development-secret-to-a-long-random-value-2026'
+    environment 'TAMVA_ACCESS_TOKEN_TTL_SECONDS', '3600'
+    environment 'TAMVA_USER_ACCESS_TOKEN_TTL_SECONDS', '900'
+    environment 'TAMVA_REFRESH_TOKEN_TTL_DAYS', '7'
+    environment 'TAMVA_WEBHOOK_ENCRYPTION_KEY', 'change-this-development-webhook-encryption-key-32chars'
+    environment 'TAMVA_WEBHOOK_MAX_ATTEMPTS', '8'
+    environment 'TAMVA_WEBHOOK_INITIAL_RETRY_SECONDS', '30'
+    environment 'TAMVA_WEBHOOK_MAX_RETRY_SECONDS', '3600'
+    environment 'TAMVA_WEBHOOK_STALE_DELIVERY_SECONDS', '120'
+    environment 'TAMVA_WEBHOOK_POLL_INTERVAL_MS', '5000'
+    environment 'REDIS_HOST', 'localhost'
+    environment 'REDIS_PORT', '6379'
+    environment 'REDIS_URL', 'redis://localhost:6379'
 }
