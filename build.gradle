@@ -54,26 +54,58 @@ dependencies {
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
+// Load .env.test for local test runs — values there take precedence over a missing shell env.
+// Secrets are stored in .env.test (gitignored), never hardcoded here.
+def testEnvFile = file("${rootDir}/.env.test")
+def testEnv = [:]
+if (testEnvFile.exists()) {
+    testEnvFile.eachLine { line ->
+        line = line.trim()
+        if (line && !line.startsWith('#') && line.contains('=')) {
+            def idx = line.indexOf('=')
+            def key   = line.substring(0, idx).trim()
+            def value = line.substring(idx + 1).trim()
+            testEnv[key] = value
+        }
+    }
+}
+
+def resolveEnv = { String key -> System.getenv(key) ?: testEnv[key] }
+
 tasks.named('test') {
     useJUnitPlatform()
-    environment 'TAMVA_DB_URL', 'jdbc:postgresql://localhost:5432/tamva'
-    environment 'SPRING_DATASOURCE_URL', 'jdbc:postgresql://localhost:5432/tamva'
-    environment 'SPRING_DATASOURCE_USERNAME', 'tamva_user'
-    environment 'SPRING_DATASOURCE_PASSWORD', 'tamva_pass'
-    environment 'SPRING_DATASOURCE_DRIVER_CLASS_NAME', 'org.postgresql.Driver'
-    environment 'TAMVA_SEED_CLIENT_SECRET', 'gcb-pilot-secret-2026'
-    environment 'TAMVA_TEST_JWT_SECRET', 'test-jwt-secret-2026-for-local-integration-testing-32chars!'
-    environment 'TAMVA_JWT_SECRET', 'change-this-development-secret-to-a-long-random-value-2026'
-    environment 'TAMVA_ACCESS_TOKEN_TTL_SECONDS', '3600'
-    environment 'TAMVA_USER_ACCESS_TOKEN_TTL_SECONDS', '900'
-    environment 'TAMVA_REFRESH_TOKEN_TTL_DAYS', '7'
-    environment 'TAMVA_WEBHOOK_ENCRYPTION_KEY', 'change-this-development-webhook-encryption-key-32chars'
-    environment 'TAMVA_WEBHOOK_MAX_ATTEMPTS', '8'
-    environment 'TAMVA_WEBHOOK_INITIAL_RETRY_SECONDS', '30'
-    environment 'TAMVA_WEBHOOK_MAX_RETRY_SECONDS', '3600'
-    environment 'TAMVA_WEBHOOK_STALE_DELIVERY_SECONDS', '120'
-    environment 'TAMVA_WEBHOOK_POLL_INTERVAL_MS', '5000'
-    environment 'REDIS_HOST', 'localhost'
-    environment 'REDIS_PORT', '6379'
-    environment 'REDIS_URL', 'redis://localhost:6379'
+
+    // Database
+    environment 'TAMVA_DB_URL',                        resolveEnv('TAMVA_DB_URL')
+    environment 'SPRING_DATASOURCE_URL',               resolveEnv('SPRING_DATASOURCE_URL')
+    environment 'SPRING_DATASOURCE_USERNAME',          resolveEnv('SPRING_DATASOURCE_USERNAME')
+    environment 'SPRING_DATASOURCE_PASSWORD',          resolveEnv('SPRING_DATASOURCE_PASSWORD')
+    environment 'SPRING_DATASOURCE_DRIVER_CLASS_NAME', resolveEnv('SPRING_DATASOURCE_DRIVER_CLASS_NAME')
+
+    // Secrets / JWT
+    environment 'TAMVA_SEED_CLIENT_SECRET',            resolveEnv('TAMVA_SEED_CLIENT_SECRET')
+    environment 'TAMVA_TEST_JWT_SECRET',               resolveEnv('TAMVA_TEST_JWT_SECRET')
+    environment 'TAMVA_JWT_SECRET',                    resolveEnv('TAMVA_JWT_SECRET')
+
+    // Tokens / TTLs
+    environment 'TAMVA_ACCESS_TOKEN_TTL_SECONDS',      resolveEnv('TAMVA_ACCESS_TOKEN_TTL_SECONDS')
+    environment 'TAMVA_USER_ACCESS_TOKEN_TTL_SECONDS', resolveEnv('TAMVA_USER_ACCESS_TOKEN_TTL_SECONDS')
+    environment 'TAMVA_REFRESH_TOKEN_TTL_DAYS',        resolveEnv('TAMVA_REFRESH_TOKEN_TTL_DAYS')
+
+    // Webhook
+    environment 'TAMVA_WEBHOOK_ENCRYPTION_KEY',        resolveEnv('TAMVA_WEBHOOK_ENCRYPTION_KEY')
+    environment 'TAMVA_WEBHOOK_MAX_ATTEMPTS',          resolveEnv('TAMVA_WEBHOOK_MAX_ATTEMPTS')
+    environment 'TAMVA_WEBHOOK_INITIAL_RETRY_SECONDS', resolveEnv('TAMVA_WEBHOOK_INITIAL_RETRY_SECONDS')
+    environment 'TAMVA_WEBHOOK_MAX_RETRY_SECONDS',     resolveEnv('TAMVA_WEBHOOK_MAX_RETRY_SECONDS')
+    environment 'TAMVA_WEBHOOK_STALE_DELIVERY_SECONDS',resolveEnv('TAMVA_WEBHOOK_STALE_DELIVERY_SECONDS')
+    environment 'TAMVA_WEBHOOK_POLL_INTERVAL_MS',      resolveEnv('TAMVA_WEBHOOK_POLL_INTERVAL_MS')
+
+    // Risk / Misc
+    environment 'TAMVA_RULESET_VERSION',               resolveEnv('TAMVA_RULESET_VERSION')
+
+    // Redis
+    environment 'REDIS_HOST',                          resolveEnv('REDIS_HOST')
+    environment 'REDIS_PORT',                          resolveEnv('REDIS_PORT')
+    environment 'REDIS_URL',                           resolveEnv('REDIS_URL')
 }
+
