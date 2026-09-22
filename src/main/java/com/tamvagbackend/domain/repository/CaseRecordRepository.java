@@ -31,4 +31,10 @@ public interface CaseRecordRepository
             UUID caseId,
             UUID institutionId
     );
+
+    List<CaseRecord> findByStatus(String status);
+
+    List<CaseRecord> findBySeverity(String severity);
+
+    List<CaseRecord> findTop50ByOrderByCreatedAtDesc();
 }

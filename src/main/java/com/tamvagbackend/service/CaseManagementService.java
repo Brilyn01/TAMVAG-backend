@@ -167,6 +167,129 @@ public class CaseManagementService {
         return toResponse(updated);
     }
 
+    @Transactional(readOnly = true)
+    public List<CaseResponse> getAdminCases(
+            String status,
+            String severity
+    ) {
+        List<CaseRecord> records;
+
+        if (status != null && !status.isBlank()) {
+            String normalizedStatus = normalize(status);
+            validateStatus(normalizedStatus);
+            records = caseRecordRepository.findByStatus(normalizedStatus);
+        } else if (severity != null && !severity.isBlank()) {
+            String normalizedSeverity = normalize(severity);
+            validateSeverity(normalizedSeverity);
+            records = caseRecordRepository.findBySeverity(normalizedSeverity);
+        } else {
+            records = caseRecordRepository.findTop50ByOrderByCreatedAtDesc();
+        }
+
+        return records.stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public CaseResponse getAdminCase(UUID caseId) {
+        requireCaseId(caseId);
+
+        CaseRecord record = caseRecordRepository.findById(caseId)
+                .orElseThrow(() -> new IllegalArgumentException("Case not found: " + caseId));
+
+        return toResponse(record);
+    }
+
+    @Transactional
+    public CaseResponse createManualCase(
+            com.tamvagbackend.dto.CaseDtos.CreateManualCaseRequest request,
+            UUID institutionId,
+            String authenticatedActor
+    ) {
+        requireAuthenticatedActor(authenticatedActor);
+        if (request == null) {
+            throw new IllegalArgumentException("Create case request is required");
+        }
+
+        CaseRecord record = new CaseRecord();
+        record.setInstitutionId(institutionId != null ? institutionId : UUID.fromString("11111111-1111-1111-1111-111111111111"));
+        record.setCaseType("MANUAL_INVESTIGATION");
+        record.setSource("MANUAL");
+        record.setTitle(request.title());
+        record.setDescription(request.description());
+        record.setSeverity(request.severity() != null ? normalize(request.severity()) : "MEDIUM");
+        record.setPriority(request.priority() != null ? normalize(request.priority()) : "NORMAL");
+        record.setStatus("OPEN");
+        record.setCustomerId(request.customerId());
+        record.setCreatedBy(authenticatedActor);
+
+        CaseRecord saved = caseRecordRepository.save(record);
+
+        auditService.logEvent(
+                "ADMIN",
+                authenticatedActor,
+                "CASE_CREATED",
+                "CASE_RECORD",
+                saved.getCaseId().toString(),
+                null,
+                "Manual case created: " + saved.getTitle()
+        );
+
+        return toResponse(saved);
+    }
+
+    @Transactional
+    public CaseResponse updateAdminCase(
+            UUID caseId,
+            String authenticatedActor,
+            CaseActionRequest request
+    ) {
+        requireCaseId(caseId);
+        requireAuthenticatedActor(authenticatedActor);
+
+        if (request == null) {
+            throw new IllegalArgumentException("Case action request is required");
+        }
+
+        CaseRecord record = caseRecordRepository.findById(caseId)
+                .orElseThrow(() -> new IllegalArgumentException("Case not found: " + caseId));
+
+        String action = normalize(request.action());
+        validateAction(action);
+
+        String previousStatus = normalize(record.getStatus());
+        String newStatus = resolveStatusForAction(action);
+
+        applyAssignee(record, request.assignee());
+        appendNotes(record, action, request.notes());
+        applyDisposition(record, request.disposition());
+
+        record.setStatus(newStatus);
+        record.setUpdatedAt(Instant.now());
+
+        CaseRecord updated = caseRecordRepository.save(record);
+
+        auditService.logEvent(
+                "ADMIN",
+                authenticatedActor,
+                "CASE_ACTION_APPLIED",
+                "CASE_RECORD",
+                caseId.toString(),
+                null,
+                buildAuditPayload(
+                        caseId,
+                        action,
+                        previousStatus,
+                        updated.getStatus(),
+                        updated.getDisposition(),
+                        updated.getAssignee()
+                )
+        );
+
+        return toResponse(updated);
+    }
+
     private void requireCaseId(UUID caseId) {
         if (caseId == null) {
             throw new IllegalArgumentException(
