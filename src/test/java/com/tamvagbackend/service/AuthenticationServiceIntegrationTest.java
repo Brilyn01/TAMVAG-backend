@@ -17,7 +17,9 @@ import static org.junit.jupiter.api.Assertions.*;
 class AuthenticationServiceIntegrationTest {
 
     private static final String DB_URL =
-        System.getenv("TAMVA_DB_URL");
+        System.getenv("TAMVA_DB_URL") != null && !System.getenv("TAMVA_DB_URL").isBlank()
+            ? System.getenv("TAMVA_DB_URL")
+            : "jdbc:postgresql://localhost:5432/tamva";
 
     private static final String TEST_JWT_SECRET =
         System.getenv("TAMVA_TEST_JWT_SECRET");
@@ -26,13 +28,20 @@ class AuthenticationServiceIntegrationTest {
         System.getenv("TAMVA_SEED_CLIENT_SECRET");
 
     private static final String S_USERNAME =
-        System.getenv("SPRING_DATASOURCE_USERNAME");
+        System.getenv("SPRING_DATASOURCE_USERNAME") != null && !System.getenv("SPRING_DATASOURCE_USERNAME").isBlank()
+            ? System.getenv("SPRING_DATASOURCE_USERNAME")
+            : "tamva_user";
 
     private static final String S_PASSWORD =
-        System.getenv("SPRING_DATASOURCE_PASSWORD");
+        System.getenv("SPRING_DATASOURCE_PASSWORD") != null && !System.getenv("SPRING_DATASOURCE_PASSWORD").isBlank()
+            ? System.getenv("SPRING_DATASOURCE_PASSWORD")
+            : "tamva_pass";
 
     private static final String S_DRIVER_CLASS =
-        System.getenv("SPRING_DATASOURCE_DRIVER_CLASS_NAME");
+        System.getenv("SPRING_DATASOURCE_DRIVER_CLASS_NAME") != null && !System.getenv("SPRING_DATASOURCE_DRIVER_CLASS_NAME").isBlank()
+            ? System.getenv("SPRING_DATASOURCE_DRIVER_CLASS_NAME")
+            : "org.postgresql.Driver";
+
 
     @DynamicPropertySource
     static void configureDatabase(DynamicPropertyRegistry registry) {

@@ -44,5 +44,6 @@ error.txt
 
 ### Environment Secrets ###
 .env
+.env.test
 .env*.local
-!.env.example
+!.env.example
