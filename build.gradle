@@ -54,6 +54,58 @@ dependencies {
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
+// Load .env.test for local test runs — values there take precedence over a missing shell env.
+// Secrets are stored in .env.test (gitignored), never hardcoded here.
+def testEnvFile = file("${rootDir}/.env.test")
+def testEnv = [:]
+if (testEnvFile.exists()) {
+    testEnvFile.eachLine { line ->
+        line = line.trim()
+        if (line && !line.startsWith('#') && line.contains('=')) {
+            def idx = line.indexOf('=')
+            def key   = line.substring(0, idx).trim()
+            def value = line.substring(idx + 1).trim()
+            testEnv[key] = value
+        }
+    }
+}
+
+def resolveEnv = { String key -> System.getenv(key) ?: testEnv[key] }
+
 tasks.named('test') {
     useJUnitPlatform()
+
+    // Database
+    environment 'TAMVA_DB_URL',                        resolveEnv('TAMVA_DB_URL')
+    environment 'SPRING_DATASOURCE_URL',               resolveEnv('SPRING_DATASOURCE_URL')
+    environment 'SPRING_DATASOURCE_USERNAME',          resolveEnv('SPRING_DATASOURCE_USERNAME')
+    environment 'SPRING_DATASOURCE_PASSWORD',          resolveEnv('SPRING_DATASOURCE_PASSWORD')
+    environment 'SPRING_DATASOURCE_DRIVER_CLASS_NAME', resolveEnv('SPRING_DATASOURCE_DRIVER_CLASS_NAME')
+
+    // Secrets / JWT
+    environment 'TAMVA_SEED_CLIENT_SECRET',            resolveEnv('TAMVA_SEED_CLIENT_SECRET')
+    environment 'TAMVA_TEST_JWT_SECRET',               resolveEnv('TAMVA_TEST_JWT_SECRET')
+    environment 'TAMVA_JWT_SECRET',                    resolveEnv('TAMVA_JWT_SECRET')
+
+    // Tokens / TTLs
+    environment 'TAMVA_ACCESS_TOKEN_TTL_SECONDS',      resolveEnv('TAMVA_ACCESS_TOKEN_TTL_SECONDS')
+    environment 'TAMVA_USER_ACCESS_TOKEN_TTL_SECONDS', resolveEnv('TAMVA_USER_ACCESS_TOKEN_TTL_SECONDS')
+    environment 'TAMVA_REFRESH_TOKEN_TTL_DAYS',        resolveEnv('TAMVA_REFRESH_TOKEN_TTL_DAYS')
+
+    // Webhook
+    environment 'TAMVA_WEBHOOK_ENCRYPTION_KEY',        resolveEnv('TAMVA_WEBHOOK_ENCRYPTION_KEY')
+    environment 'TAMVA_WEBHOOK_MAX_ATTEMPTS',          resolveEnv('TAMVA_WEBHOOK_MAX_ATTEMPTS')
+    environment 'TAMVA_WEBHOOK_INITIAL_RETRY_SECONDS', resolveEnv('TAMVA_WEBHOOK_INITIAL_RETRY_SECONDS')
+    environment 'TAMVA_WEBHOOK_MAX_RETRY_SECONDS',     resolveEnv('TAMVA_WEBHOOK_MAX_RETRY_SECONDS')
+    environment 'TAMVA_WEBHOOK_STALE_DELIVERY_SECONDS',resolveEnv('TAMVA_WEBHOOK_STALE_DELIVERY_SECONDS')
+    environment 'TAMVA_WEBHOOK_POLL_INTERVAL_MS',      resolveEnv('TAMVA_WEBHOOK_POLL_INTERVAL_MS')
+
+    // Risk / Misc
+    environment 'TAMVA_RULESET_VERSION',               resolveEnv('TAMVA_RULESET_VERSION')
+
+    // Redis
+    environment 'REDIS_HOST',                          resolveEnv('REDIS_HOST')
+    environment 'REDIS_PORT',                          resolveEnv('REDIS_PORT')
+    environment 'REDIS_URL',                           resolveEnv('REDIS_URL')
 }
+

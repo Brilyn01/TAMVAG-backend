@@ -117,14 +117,47 @@ public class RiskEngineService {
 
         RiskEvent savedEvent = riskEventRepository.save(event);
 
+        
         // Auto-create operational case if HOLD or BLOCK
-        if (riskScore >= 70 || "BLOCK".equals(decision) || "HOLD".equals(decision)) {
+        if (riskScore >= 70
+                || "BLOCK".equals(decision)
+                || "HOLD".equals(decision)) {
+
+            if (account == null
+                    || account.getInstitution() == null
+                    || account.getInstitution().getInstitutionId() == null) {
+
+                throw new IllegalStateException(
+                        "Cannot create an institution-scoped case "
+                                + "without an account institution"
+                );
+            }
+
             CaseRecord caseRecord = new CaseRecord();
+
+            caseRecord.setInstitutionId(
+                    account.getInstitution().getInstitutionId()
+            );
+
+            caseRecord.setCaseType("RISK_EVENT");
             caseRecord.setRiskEvent(savedEvent);
-            caseRecord.setSeverity(riskScore >= 90 ? "CRITICAL" : "HIGH");
+            caseRecord.setCustomerId(customer.getCustomerId());
+            caseRecord.setSeverity(
+                    riskScore >= 90 ? "CRITICAL" : "HIGH"
+            );
+            caseRecord.setPriority("NORMAL");
             caseRecord.setStatus("OPEN");
             caseRecord.setSource("RULES_ENGINE");
-            caseRecord.setNotes("Automated risk alert triggered: " + String.join(", ", reasonCodes));
+            caseRecord.setCreatedBy("risk-engine");
+            caseRecord.setTitle("Automated risk alert");
+            caseRecord.setDescription(
+                    "Automated risk alert triggered by the risk engine."
+            );
+            caseRecord.setNotes(
+                    "Automated risk alert triggered: "
+                            + String.join(", ", reasonCodes)
+            );
+
             caseRecordRepository.save(caseRecord);
         }
 

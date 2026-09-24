@@ -1,8 +1,8 @@
 package com.tamvagbackend.service;
 
 import com.tamvagbackend.domain.entity.Customer;
-import com.tamvagbackend.domain.entity.RefreshTokenSession;
 import com.tamvagbackend.domain.entity.TamvaUser;
+import com.tamvagbackend.domain.entity.RefreshTokenSession;
 import com.tamvagbackend.domain.repository.CustomerRepository;
 import com.tamvagbackend.domain.repository.RefreshTokenSessionRepository;
 import com.tamvagbackend.domain.repository.TamvaUserRepository;
@@ -395,8 +395,7 @@ public class UserAuthService {
          * - profile:read
          * - profile:write
          * - risk:evaluate
-         * - cases:read
-         * - cases:write
+         
          *
          * Other roles allowed:
          * - profile:read
@@ -406,13 +405,14 @@ public class UserAuthService {
                 ? ""
                 : user.getRole().trim().toUpperCase();
 
-        return switch (role) {
-                case "CUSTOMER" ->
-                        "profile:read profile:write risk:evaluate cases:read cases:write";
 
-                default ->
-                        "profile:read";
-        };
+                return switch (role) {
+                        case "CUSTOMER" ->
+                                "profile:read profile:write risk:evaluate";
+
+                        default ->
+                                "profile:read";
+                };
     }
 
     private void createRefreshTokenSession(

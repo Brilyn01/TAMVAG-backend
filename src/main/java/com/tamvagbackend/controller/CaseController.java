@@ -10,6 +10,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
@@ -95,14 +96,42 @@ public class CaseController {
                 caseManagementService.updateCase(
                         caseId,
                         institutionId(jwt),
+                        jwt.getSubject(),
                         request
                 )
         );
     }
 
     private UUID institutionId(Jwt jwt) {
-        return UUID.fromString(
-                jwt.getClaimAsString("institution_id")
-        );
+        if (jwt == null) {
+                throw new AccessDeniedException(
+                        "Authenticated token is required"
+                );
+        }
+
+        String tokenType = jwt.getClaimAsString("token_type");
+
+        if (!"institution".equals(tokenType)) {
+                throw new AccessDeniedException(
+                        "Institution token is required for case operations"
+                );
+        }
+
+        String institutionId = jwt.getClaimAsString("institution_id");
+
+        if (institutionId == null || institutionId.isBlank()) {
+                throw new AccessDeniedException(
+                        "institution_id claim is required"
+                );
+        }
+
+        try {
+                return UUID.fromString(institutionId);
+        } catch (IllegalArgumentException exception) {
+                throw new AccessDeniedException(
+                        "institution_id claim must be a valid UUID",
+                        exception
+                );
+        }
     }
 }
