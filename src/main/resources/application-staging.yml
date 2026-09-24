@@ -1,8 +1,8 @@
-﻿# Test Profile (test)
+﻿# Staging Profile (staging)
 spring:
   config:
     activate:
-      on-profile: test
+      on-profile: staging
 
 tamva:
   seeder:
@@ -11,3 +11,4 @@ tamva:
 logging:
   level:
     com.tamvagbackend: INFO
+    org.springframework.security: INFO

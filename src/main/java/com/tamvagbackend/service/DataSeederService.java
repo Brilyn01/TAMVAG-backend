@@ -1,5 +1,7 @@
 package com.tamvagbackend.service;
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Profile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import com.tamvagbackend.domain.entity.*;
@@ -16,6 +18,8 @@ import java.time.temporal.ChronoUnit;
 import java.util.*;
 
 @Component
+@Profile({"dev", "local", "default"})
+@ConditionalOnProperty(name = "tamva.seeder.enabled", havingValue = "true", matchIfMissing = true)
 public class DataSeederService implements CommandLineRunner {
 
     private static final Logger log = LoggerFactory.getLogger(DataSeederService.class);
