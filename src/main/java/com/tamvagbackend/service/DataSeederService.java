@@ -30,6 +30,7 @@ public class DataSeederService implements CommandLineRunner {
     private final ExchangeRateRepository exchangeRateRepository;
     private final LedgerService ledgerService;
     private final MultiCurrencyWalletService walletService;
+    private final AdminUserRepository adminUserRepository;
 
     public DataSeederService(
             InstitutionRepository institutionRepository,
@@ -41,6 +42,7 @@ public class DataSeederService implements CommandLineRunner {
             ExchangeRateRepository exchangeRateRepository,
             LedgerService ledgerService,
             MultiCurrencyWalletService walletService,
+            AdminUserRepository adminUserRepository,
             PasswordEncoder passwordEncoder
     ) {
         this.institutionRepository = institutionRepository;
@@ -52,6 +54,7 @@ public class DataSeederService implements CommandLineRunner {
         this.exchangeRateRepository = exchangeRateRepository;
         this.ledgerService = ledgerService;
         this.walletService = walletService;
+        this.adminUserRepository = adminUserRepository;
         this.passwordEncoder = passwordEncoder;
     }
 
@@ -186,7 +189,21 @@ public class DataSeederService implements CommandLineRunner {
 
         ledgerService.recordTransaction(abenaTelecel.getAccountId(), "SRC_TC_001", "IN", new BigDecimal("3200.00"), "GHS", now.minus(20, ChronoUnit.DAYS), "USSD", "Freelance Design Payment", "UI Design Project Inflow", "telecel_cash");
 
-        log.info("Successfully seeded TAMVA Ghanaian ecosystem with 5 institutions, sample customers, multi-currency wallets, and transactions!");
+        // 9. Seed Initial Bootstrap Super Admin (if not present)
+        if (adminUserRepository.count() == 0) {
+            AdminUser superAdmin = new AdminUser();
+            superAdmin.setEmail("superadmin@tamva.com");
+            superAdmin.setPasswordHash(passwordEncoder.encode("TamvaSuperAdmin!2026"));
+            superAdmin.setFirstName("TAMVA");
+            superAdmin.setLastName("SuperAdmin");
+            superAdmin.setRole("SUPER_ADMIN");
+            superAdmin.setOperationalRole("SECURITY_ADMINISTRATOR");
+            superAdmin.setStatus("ACTIVE");
+            adminUserRepository.save(superAdmin);
+            log.info("Seeded initial bootstrap super admin: superadmin@tamva.com");
+        }
+
+        log.info("Successfully seeded TAMVA Ghanaian ecosystem with 5 institutions, sample customers, multi-currency wallets, transactions, and bootstrap super admin!");
     }
 
     private void seedExchangeRates() {

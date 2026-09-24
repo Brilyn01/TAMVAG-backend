@@ -93,7 +93,6 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/v1/auth/token",
                                 "/v1/admin/auth/login",
-                                "/v1/admin/auth/signup",
                                 "/v1/admin/auth/logout",
                                 "/v1/users/signup",
                                 "/v1/users/signin",
