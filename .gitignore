@@ -39,8 +39,8 @@ out/
 ### JVM Crash Dumps ###
 hs_err_pid*.log
 replay_pid*.log
-error.txt
-*error.txt
+*.txt
+
 
 ### Environment Secrets ###
 .env
