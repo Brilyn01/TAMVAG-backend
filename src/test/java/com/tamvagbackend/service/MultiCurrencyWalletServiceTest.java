@@ -59,4 +59,42 @@ class MultiCurrencyWalletServiceTest {
         assertNotNull(rate);
         assertTrue(rate.compareTo(new BigDecimal("100.00")) > 0);
     }
+
+    @Test
+    void testExecuteTransfer_IdempotentDuplicateReference() {
+        UUID customerId = UUID.randomUUID();
+        Customer customer = new Customer();
+        customer.setCustomerId(customerId);
+
+        Wallet wallet = new Wallet(customer, "GHS");
+        wallet.setWalletId(UUID.randomUUID());
+
+        CurrencyTransfer existingTransfer = new CurrencyTransfer();
+        existingTransfer.setTransferId(UUID.randomUUID());
+        existingTransfer.setWallet(wallet);
+        existingTransfer.setFromCurrency("GHS");
+        existingTransfer.setToCurrency("USD");
+        existingTransfer.setFromAmount(new BigDecimal("100.00"));
+        existingTransfer.setToAmount(new BigDecimal("6.50"));
+        existingTransfer.setRateApplied(new BigDecimal("0.065000"));
+        existingTransfer.setFeeAmount(new BigDecimal("0.50"));
+        existingTransfer.setStatus("COMPLETED");
+        existingTransfer.setReference("TXF_DUP_001");
+        existingTransfer.setCreatedAt(java.time.Instant.now());
+
+        org.mockito.Mockito.when(customerRepository.findById(customerId)).thenReturn(Optional.of(customer));
+        org.mockito.Mockito.when(walletRepository.findByCustomer(customer)).thenReturn(Optional.of(wallet));
+        org.mockito.Mockito.when(currencyTransferRepository.findByWalletAndReference(wallet, "TXF_DUP_001"))
+                .thenReturn(Optional.of(existingTransfer));
+
+        CurrencyTransferRequest req = new CurrencyTransferRequest(customerId, "GHS", "USD", new BigDecimal("100.00"), "TXF_DUP_001");
+        CurrencyTransferResponse response = walletService.executeTransfer(req);
+
+        assertNotNull(response);
+        assertEquals("TXF_DUP_001", response.reference());
+        assertEquals(existingTransfer.getTransferId(), response.transferId());
+
+        org.mockito.Mockito.verify(walletBalanceRepository, org.mockito.Mockito.never()).save(any());
+    }
 }
+
