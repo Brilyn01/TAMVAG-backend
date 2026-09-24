@@ -103,4 +103,9 @@ public class AdminAuthenticationService {
                 permissions
         );
     }
+
+    public AdminLogoutResponse logout() {
+        return new AdminLogoutResponse("Admin logged out successfully");
+    }
 }
+

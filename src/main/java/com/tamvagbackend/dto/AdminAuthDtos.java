@@ -92,4 +92,10 @@ public final class AdminAuthDtos {
             String status,
             Instant createdAt
     ) {}
+
+    public record AdminLogoutResponse(
+            @Schema(example = "Admin logged out successfully")
+            String message
+    ) {}
 }
+

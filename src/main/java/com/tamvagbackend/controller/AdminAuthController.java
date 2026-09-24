@@ -2,6 +2,7 @@ package com.tamvagbackend.controller;
 
 import com.tamvagbackend.dto.AdminAuthDtos.AdminLoginRequest;
 import com.tamvagbackend.dto.AdminAuthDtos.AdminLoginResponse;
+import com.tamvagbackend.dto.AdminAuthDtos.AdminLogoutResponse;
 import com.tamvagbackend.dto.AdminAuthDtos.AdminProvisionRequest;
 import com.tamvagbackend.dto.AdminAuthDtos.AdminProvisionResponse;
 import com.tamvagbackend.service.AdminAuthenticationService;
@@ -54,5 +55,16 @@ public class AdminAuthController {
     public ResponseEntity<AdminLoginResponse> login(@Valid @RequestBody AdminLoginRequest request) {
         return ResponseEntity.ok(adminAuthenticationService.login(request));
     }
+
+    @PostMapping("/logout")
+    @Operation(
+            summary = "Admin logout",
+            description = "Logs out the administrative user session",
+            security = {}
+    )
+    public ResponseEntity<AdminLogoutResponse> logout() {
+        return ResponseEntity.ok(adminAuthenticationService.logout());
+    }
 }
+
 
