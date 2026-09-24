@@ -172,30 +172,120 @@ public class LedgerService {
                 transactionRepository.save(normalizedTransaction);
 
         /*
-         * Classify and create double-entry inspired ledger entry.
+         * Balanced Double-Entry Financial Posting:
+         * Every transaction produces matching Debit and Credit entries so total Debits equal total Credits.
          */
-        String entryType =
-                classifyTransaction(account, savedTx);
+        String entryType = classifyTransaction(account, savedTx);
+        String primaryEffect = "IN".equalsIgnoreCase(savedTx.getDirection()) ? "CREDIT" : "DEBIT";
+        String offsettingEffect = "CREDIT".equals(primaryEffect) ? "DEBIT" : "CREDIT";
 
-        String balanceEffect =
-                "IN".equalsIgnoreCase(savedTx.getDirection())
-                        ? "CREDIT"
-                        : "DEBIT";
+        Instant now = Instant.now();
 
-        LedgerEntry entry = new LedgerEntry();
+        // 1. Primary Account Entry
+        LedgerEntry primaryEntry = new LedgerEntry();
+        primaryEntry.setTransaction(savedTx);
+        primaryEntry.setEntryType(entryType);
+        primaryEntry.setAmount(savedTx.getAmount());
+        primaryEntry.setCurrency(savedTx.getCurrency());
+        primaryEntry.setBalanceEffect(primaryEffect);
+        primaryEntry.setCounterpartyId(savedTx.getCounterparty());
+        primaryEntry.setConfidence(BigDecimal.ONE);
+        primaryEntry.setCreatedAt(now);
+        ledgerEntryRepository.save(primaryEntry);
 
-        entry.setTransaction(savedTx);
-        entry.setEntryType(entryType);
-        entry.setAmount(savedTx.getAmount());
-        entry.setCurrency(savedTx.getCurrency());
-        entry.setBalanceEffect(balanceEffect);
-        entry.setCounterpartyId(savedTx.getCounterparty());
-        entry.setConfidence(BigDecimal.ONE);
-        entry.setCreatedAt(Instant.now());
-
-        ledgerEntryRepository.save(entry);
+        // 2. Offsetting System/Clearing Entry (Balancing Entry)
+        LedgerEntry offsettingEntry = new LedgerEntry();
+        offsettingEntry.setTransaction(savedTx);
+        offsettingEntry.setEntryType("CLEARING_" + entryType);
+        offsettingEntry.setAmount(savedTx.getAmount());
+        offsettingEntry.setCurrency(savedTx.getCurrency());
+        offsettingEntry.setBalanceEffect(offsettingEffect);
+        offsettingEntry.setCounterpartyId(savedTx.getCounterparty() != null ? savedTx.getCounterparty() : "SYSTEM_CLEARING");
+        offsettingEntry.setConfidence(BigDecimal.ONE);
+        offsettingEntry.setCreatedAt(now);
+        ledgerEntryRepository.save(offsettingEntry);
 
         return savedTx;
+    }
+
+    /**
+     * Reverses a completed financial transaction by recording an immutable reversal
+     * transaction with opposite debit/credit postings. History is never edited or deleted.
+     */
+    @Transactional
+    public Transaction reverseTransaction(UUID originalTransactionId, String reason) {
+        Transaction originalTx = transactionRepository.findById(originalTransactionId)
+                .orElseThrow(() -> new IllegalArgumentException("Original transaction not found: " + originalTransactionId));
+
+        if ("REVERSED".equalsIgnoreCase(originalTx.getStatus())) {
+            throw new IllegalStateException("Transaction " + originalTransactionId + " is already reversed");
+        }
+
+        originalTx.setStatus("REVERSED");
+        transactionRepository.save(originalTx);
+
+        String reversedDirection = "IN".equalsIgnoreCase(originalTx.getDirection()) ? "OUT" : "IN";
+        String reversalRef = "REVERSAL: " + (reason != null && !reason.isBlank() ? reason : "Correction")
+                + " (Ref: " + originalTx.getTransactionId() + ")";
+
+        Transaction reversalTx = new Transaction();
+        reversalTx.setAccount(originalTx.getAccount());
+        reversalTx.setSourceEventId("REV_" + (originalTx.getSourceEventId() != null ? originalTx.getSourceEventId() : UUID.randomUUID().toString()));
+        reversalTx.setDirection(reversedDirection);
+        reversalTx.setAmount(originalTx.getAmount());
+        reversalTx.setCurrency(originalTx.getCurrency());
+        reversalTx.setOccurredAt(Instant.now());
+        reversalTx.setStatus("COMPLETED");
+        reversalTx.setChannel(originalTx.getChannel());
+        reversalTx.setCounterparty(originalTx.getCounterparty());
+        reversalTx.setMerchantCategory(originalTx.getMerchantCategory());
+        reversalTx.setReference(reversalRef);
+        reversalTx.setSourceSystem(originalTx.getSourceSystem());
+        reversalTx.setNormalisationVersion(originalTx.getNormalisationVersion());
+        reversalTx.setCreatedAt(Instant.now());
+
+        Transaction savedReversalTx = transactionRepository.save(reversalTx);
+
+        // Record balanced reversal entries
+        String entryType = "REVERSAL";
+        String primaryEffect = "IN".equalsIgnoreCase(reversedDirection) ? "CREDIT" : "DEBIT";
+        String offsettingEffect = "CREDIT".equals(primaryEffect) ? "DEBIT" : "CREDIT";
+
+        Instant now = Instant.now();
+
+        LedgerEntry primaryEntry = new LedgerEntry();
+        primaryEntry.setTransaction(savedReversalTx);
+        primaryEntry.setEntryType(entryType);
+        primaryEntry.setAmount(savedReversalTx.getAmount());
+        primaryEntry.setCurrency(savedReversalTx.getCurrency());
+        primaryEntry.setBalanceEffect(primaryEffect);
+        primaryEntry.setCounterpartyId(savedReversalTx.getCounterparty());
+        primaryEntry.setConfidence(BigDecimal.ONE);
+        primaryEntry.setCreatedAt(now);
+        ledgerEntryRepository.save(primaryEntry);
+
+        LedgerEntry offsettingEntry = new LedgerEntry();
+        offsettingEntry.setTransaction(savedReversalTx);
+        offsettingEntry.setEntryType("CLEARING_REVERSAL");
+        offsettingEntry.setAmount(savedReversalTx.getAmount());
+        offsettingEntry.setCurrency(savedReversalTx.getCurrency());
+        offsettingEntry.setBalanceEffect(offsettingEffect);
+        offsettingEntry.setCounterpartyId(savedReversalTx.getCounterparty() != null ? savedReversalTx.getCounterparty() : "SYSTEM_CLEARING");
+        offsettingEntry.setConfidence(BigDecimal.ONE);
+        offsettingEntry.setCreatedAt(now);
+        ledgerEntryRepository.save(offsettingEntry);
+
+        auditService.logEvent(
+                "SYSTEM",
+                "system",
+                "TRANSACTION_REVERSED",
+                "TRANSACTION",
+                savedReversalTx.getTransactionId().toString(),
+                null,
+                "Reversed transaction " + originalTransactionId + ": " + reason
+        );
+
+        return savedReversalTx;
     }
 
     /**
