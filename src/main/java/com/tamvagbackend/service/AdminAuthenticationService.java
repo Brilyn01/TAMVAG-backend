@@ -30,7 +30,7 @@ public class AdminAuthenticationService {
             AdminUserRepository adminUserRepository,
             PasswordEncoder passwordEncoder,
             JwtEncoder jwtEncoder,
-            @Value("${tamva.security.admin-access-token-ttl-seconds:3600}")
+            @Value("${tamva.security.admin-access-token-ttl-seconds}")
             long adminAccessTokenTtlSeconds
     ) {
         this.adminUserRepository = adminUserRepository;
