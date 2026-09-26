@@ -188,9 +188,22 @@ public class MultiCurrencyWalletService {
 
         Wallet wallet = getOrCreateWallet(customer);
 
-        WalletBalance fromBalance = walletBalanceRepository.findByWalletAndCurrency(wallet, from)
+        // Idempotency check: if reference is provided, prevent duplicate execution
+        if (request.reference() != null && !request.reference().isBlank()) {
+            Optional<CurrencyTransfer> existingTransfer = currencyTransferRepository.findByWalletAndReference(wallet, request.reference().trim());
+            if (existingTransfer.isPresent()) {
+                log.info("Idempotent currency transfer request detected for reference {}", request.reference());
+                return toTransferResponse(existingTransfer.get());
+            }
+        }
+
+        // Pessimistic DB lock on source and destination balance rows to prevent race conditions
+        WalletBalance fromBalance = walletBalanceRepository.findByWalletAndCurrencyForUpdate(wallet, from)
+                .or(() -> walletBalanceRepository.findByWalletAndCurrency(wallet, from))
                 .orElseThrow(() -> new IllegalStateException("Balance record not found for " + from));
-        WalletBalance toBalance = walletBalanceRepository.findByWalletAndCurrency(wallet, to)
+
+        WalletBalance toBalance = walletBalanceRepository.findByWalletAndCurrencyForUpdate(wallet, to)
+                .or(() -> walletBalanceRepository.findByWalletAndCurrency(wallet, to))
                 .orElseThrow(() -> new IllegalStateException("Balance record not found for " + to));
 
         if (fromBalance.getAvailableAmount().compareTo(request.amount()) < 0) {
@@ -223,7 +236,7 @@ public class MultiCurrencyWalletService {
         transfer.setRateApplied(rate);
         transfer.setFeeAmount(fee);
         transfer.setStatus("COMPLETED");
-        transfer.setReference(request.reference() != null && !request.reference().isBlank() ? request.reference() : "TXF_" + UUID.randomUUID().toString().substring(0, 10).toUpperCase());
+        transfer.setReference(request.reference() != null && !request.reference().isBlank() ? request.reference().trim() : "TXF_" + UUID.randomUUID().toString().substring(0, 10).toUpperCase());
         transfer.setCreatedAt(Instant.now());
 
         CurrencyTransfer savedTransfer = currencyTransferRepository.save(transfer);
