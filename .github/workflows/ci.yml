@@ -15,9 +15,9 @@ jobs:
       postgres:
         image: postgres:17
         env:
-          POSTGRES_DB: tamva
-          POSTGRES_USER: tamva_user
-          POSTGRES_PASSWORD: tamva_test_password_2026
+          POSTGRES_DB: ${{ secrets.POSTGRES_DB || 'tamva' }}
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER || 'tamva_user' }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD || secrets.SPRING_DATASOURCE_PASSWORD }}
         ports:
           - 5432:5432
         options: >-
@@ -50,19 +50,29 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
+      - name: Load Environment Variables from .env File (if present)
+        run: |
+          if [ -f .env ]; then
+            echo "Loading environment variables from .env..."
+            cat .env >> $GITHUB_ENV
+          elif [ -f .env.test ]; then
+            echo "Loading environment variables from .env.test..."
+            cat .env.test >> $GITHUB_ENV
+          fi
+
       - name: Run Gradle Test Suite & Verification
         env:
-          TAMVA_DB_URL: jdbc:postgresql://localhost:5432/tamva
-          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/tamva
-          SPRING_DATASOURCE_USERNAME: tamva_user
-          SPRING_DATASOURCE_PASSWORD: tamva_test_password_2026
-          REDIS_HOST: localhost
-          REDIS_PORT: 6379
-          REDIS_URL: redis://localhost:6379
-          TAMVA_JWT_SECRET: 261edf5ef58ff5e64455170c974783a97d66759bbc1ffb3a66ccd632f217b031
-          TAMVA_TEST_JWT_SECRET: fa07f7202f41b534f8aff5ddd3650ffcb5a3cdf5385e03a43ab931096eeb5580
-          TAMVA_WEBHOOK_ENCRYPTION_KEY: fe255c8e0d3ed0f9cee37296e0e50ae8
-          TAMVA_SEED_CLIENT_SECRET: gcb-pilot-secret-2026
+          TAMVA_DB_URL: ${{ secrets.TAMVA_DB_URL || 'jdbc:postgresql://localhost:5432/tamva' }}
+          SPRING_DATASOURCE_URL: ${{ secrets.SPRING_DATASOURCE_URL || 'jdbc:postgresql://localhost:5432/tamva' }}
+          SPRING_DATASOURCE_USERNAME: ${{ secrets.SPRING_DATASOURCE_USERNAME || 'tamva_user' }}
+          SPRING_DATASOURCE_PASSWORD: ${{ secrets.SPRING_DATASOURCE_PASSWORD || secrets.POSTGRES_PASSWORD }}
+          REDIS_HOST: ${{ secrets.REDIS_HOST || 'localhost' }}
+          REDIS_PORT: ${{ secrets.REDIS_PORT || '6379' }}
+          REDIS_URL: ${{ secrets.REDIS_URL || 'redis://localhost:6379' }}
+          TAMVA_JWT_SECRET: ${{ secrets.TAMVA_JWT_SECRET }}
+          TAMVA_TEST_JWT_SECRET: ${{ secrets.TAMVA_TEST_JWT_SECRET }}
+          TAMVA_WEBHOOK_ENCRYPTION_KEY: ${{ secrets.TAMVA_WEBHOOK_ENCRYPTION_KEY }}
+          TAMVA_SEED_CLIENT_SECRET: ${{ secrets.TAMVA_SEED_CLIENT_SECRET }}
           PORT: 8080
         run: ./gradlew clean test --console=plain --no-daemon
 
