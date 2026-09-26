@@ -10,8 +10,8 @@ spring:
       - org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
   datasource:
     url: ${SPRING_DATASOURCE_URL:${DATABASE_URL:${POSTGRES_URL:jdbc:h2:mem:tamvadb;DB_CLOSE_DELAY=-1;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH}}}
-    username: ${SPRING_DATASOURCE_USERNAME:${POSTGRES_USER:tamva_user}}
-    password: ${SPRING_DATASOURCE_PASSWORD:${POSTGRES_PASSWORD:tamva_pass}}
+    username: ${SPRING_DATASOURCE_USERNAME:${POSTGRES_USER}}
+    password: ${SPRING_DATASOURCE_PASSWORD:${POSTGRES_PASSWORD}}
     driver-class-name: ${SPRING_DATASOURCE_DRIVER_CLASS_NAME:org.h2.Driver}
     hikari:
       maximum-pool-size: 10
@@ -39,7 +39,7 @@ spring:
       url: ${SPRING_DATA_REDIS_URL:${REDIS_URL:redis://localhost:6379}}
       host: ${SPRING_DATA_REDIS_HOST:${REDIS_HOST:localhost}}
       port: ${SPRING_DATA_REDIS_PORT:${REDIS_PORT:6379}}
-      password: ${SPRING_DATA_REDIS_PASSWORD:${REDIS_PASSWORD:}}
+      password: ${SPRING_DATA_REDIS_PASSWORD}
       timeout: 2000ms
 
   # Kafka Configuration for Async Transaction Ingestion
@@ -127,11 +127,12 @@ tamva:
       block-threshold: 90
   model-version: fraud-v3.2
   default-currency: GHS
-  security:
-    jwt-secret: ${TAMVA_JWT_SECRET:change-this-to-a-secret-in-your-env-file}
-    access-token-ttl-seconds: ${TAMVA_ACCESS_TOKEN_TTL_SECONDS:3600}
-    user-access-token-ttl-seconds: ${TAMVA_USER_ACCESS_TOKEN_TTL_SECONDS:900}
-    refresh-token-ttl-days: ${TAMVA_REFRESH_TOKEN_TTL_DAYS:7}
+ security:
+  jwt-secret: ${TAMVA_JWT_SECRET}
+  access-token-ttl-seconds: ${TAMVA_ACCESS_TOKEN_TTL_SECONDS}
+  user-access-token-ttl-seconds: ${TAMVA_USER_ACCESS_TOKEN_TTL_SECONDS}
+  admin-access-token-ttl-seconds: ${TAMVA_SECURITY_ADMIN_ACCESS_TOKEN_TTL_SECONDS}
+  refresh-token-ttl-days: ${TAMVA_REFRESH_TOKEN_TTL_DAYS}
   kafka:
     enabled: false # Set to true only when a Kafka broker is available
     topics:
@@ -139,7 +140,7 @@ tamva:
       transaction-normalised: tamva.transaction.normalised
       transaction-dlq: tamva.transaction.dlq
   webhook:
-    encryption-key: ${TAMVA_WEBHOOK_ENCRYPTION_KEY:change-this-webhook-key-in-your-env-file}
+    encryption-key: ${TAMVA_WEBHOOK_ENCRYPTION_KEY}
     max-attempts: ${TAMVA_WEBHOOK_MAX_ATTEMPTS:8}
     initial-retry-seconds: ${TAMVA_WEBHOOK_INITIAL_RETRY_SECONDS:30}
     max-retry-seconds: ${TAMVA_WEBHOOK_MAX_RETRY_SECONDS:3600}
