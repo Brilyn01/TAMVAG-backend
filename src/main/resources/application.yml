@@ -127,12 +127,12 @@ tamva:
       block-threshold: 90
   model-version: fraud-v3.2
   default-currency: GHS
- security:
-  jwt-secret: ${TAMVA_JWT_SECRET}
-  access-token-ttl-seconds: ${TAMVA_ACCESS_TOKEN_TTL_SECONDS}
-  user-access-token-ttl-seconds: ${TAMVA_USER_ACCESS_TOKEN_TTL_SECONDS}
-  admin-access-token-ttl-seconds: ${TAMVA_SECURITY_ADMIN_ACCESS_TOKEN_TTL_SECONDS}
-  refresh-token-ttl-days: ${TAMVA_REFRESH_TOKEN_TTL_DAYS}
+  security:
+    jwt-secret: ${TAMVA_JWT_SECRET}
+    access-token-ttl-seconds: ${TAMVA_ACCESS_TOKEN_TTL_SECONDS}
+    user-access-token-ttl-seconds: ${TAMVA_USER_ACCESS_TOKEN_TTL_SECONDS}
+    admin-access-token-ttl-seconds: ${TAMVA_SECURITY_ADMIN_ACCESS_TOKEN_TTL_SECONDS}
+    refresh-token-ttl-days: ${TAMVA_REFRESH_TOKEN_TTL_DAYS}
   kafka:
     enabled: false # Set to true only when a Kafka broker is available
     topics:
