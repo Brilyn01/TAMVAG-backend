@@ -11,6 +11,7 @@ import com.tamvagbackend.dto.AuditDtos.ConnectorSyncRequest;
 import com.tamvagbackend.dto.AuditDtos.ConnectorSyncResponse;
 import com.tamvagbackend.service.connector.ConnectorProvider;
 import com.tamvagbackend.service.connector.ConnectorProviderRegistry;
+import com.tamvagbackend.security.CallerContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -65,6 +66,8 @@ class ConnectorServiceTest {
 
     private Connection connection;
     private Account account;
+    private CallerContext.InstitutionCaller institutionCaller;
+    private CallerContext.AdminCaller adminCaller;
 
     @BeforeEach
     void setUp() {
@@ -82,6 +85,9 @@ class ConnectorServiceTest {
         customerId = UUID.randomUUID();
         institutionId = UUID.randomUUID();
         accountId = UUID.randomUUID();
+
+        institutionCaller = new CallerContext.InstitutionCaller(institutionId, UUID.randomUUID());
+        adminCaller = new CallerContext.AdminCaller(UUID.randomUUID(), "admin@tamva.com", "SUPER_ADMIN", "SECURITY_ADMIN");
 
         Customer customer = new Customer();
         customer.setCustomerId(customerId);
@@ -161,7 +167,7 @@ class ConnectorServiceTest {
                 connectorService.sync(
                         connectionId,
                         request,
-                        institutionId
+                        institutionCaller
                 );
 
         assertNotNull(response);
@@ -206,6 +212,72 @@ class ConnectorServiceTest {
                 anyString(),
                 contains("Connector sync completed")
         );
+    }
+
+    @Test
+    void syncShouldAttributeAdminCallerInAuditLog() {
+        ConnectorSyncRequest request = new ConnectorSyncRequest(
+                customerId,
+                institutionId,
+                "FULL"
+        );
+
+        when(connectionRepository
+                .findByConnectionIdAndCustomerIdAndInstitutionId(
+                        connectionId,
+                        customerId,
+                        institutionId
+                ))
+                .thenReturn(Optional.of(connection));
+
+        when(providerRegistry.getProvider("GCB"))
+                .thenReturn(connectorProvider);
+
+        when(connectorProvider.fetchTransactions(any()))
+                .thenReturn(List.of());
+
+        when(consentAuthorizationService.requireConsent(
+                customerId,
+                institutionId,
+                "CASH_FLOW"
+        ))
+                .thenReturn(null);
+
+        when(connectionRepository.save(any(Connection.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        ConnectorSyncResponse response =
+                connectorService.sync(
+                        connectionId,
+                        request,
+                        adminCaller
+                );
+
+        assertNotNull(response);
+        assertEquals("COMPLETED", response.status());
+
+        verify(auditService).logEvent(
+                eq("ADMIN"),
+                eq(adminCaller.adminUserId().toString()),
+                eq("CONNECTOR_SYNC"),
+                eq("CONNECTION"),
+                eq(connectionId.toString()),
+                anyString(),
+                contains("Connector sync completed")
+        );
+    }
+
+    @Test
+    void getConnectionsReturnsAllForAdminCaller() {
+        when(connectionRepository.findAll())
+                .thenReturn(List.of(connection));
+
+        var connections = connectorService.getConnections(adminCaller);
+
+        assertEquals(1, connections.size());
+        assertEquals(connectionId, connections.get(0).connectionId());
+        verify(connectionRepository).findAll();
+        verify(connectionRepository, never()).findByInstitution_InstitutionId(any());
     }
 
     @Test
@@ -276,7 +348,7 @@ class ConnectorServiceTest {
                 connectorService.sync(
                         connectionId,
                         request,
-                        institutionId
+                        institutionCaller
                 );
 
         assertNotNull(response);
@@ -302,7 +374,8 @@ class ConnectorServiceTest {
 
     @Test
     void syncShouldRejectInstitutionMismatch() {
-        UUID authenticatedInstitutionId = UUID.randomUUID();
+        CallerContext.InstitutionCaller mismatchCaller =
+                new CallerContext.InstitutionCaller(UUID.randomUUID(), UUID.randomUUID());
 
         ConnectorSyncRequest request = new ConnectorSyncRequest(
                 customerId,
@@ -315,7 +388,7 @@ class ConnectorServiceTest {
                 () -> connectorService.sync(
                         connectionId,
                         request,
-                        authenticatedInstitutionId
+                        mismatchCaller
                 )
         );
 
@@ -347,7 +420,7 @@ class ConnectorServiceTest {
                 () -> connectorService.sync(
                         connectionId,
                         request,
-                        institutionId
+                        institutionCaller
                 )
         );
 
@@ -380,7 +453,7 @@ class ConnectorServiceTest {
                 () -> connectorService.sync(
                         connectionId,
                         request,
-                        institutionId
+                        institutionCaller
                 )
         );
 
@@ -418,7 +491,7 @@ class ConnectorServiceTest {
                 () -> connectorService.sync(
                         connectionId,
                         request,
-                        institutionId
+                        institutionCaller
                 )
         );
 
@@ -461,7 +534,7 @@ class ConnectorServiceTest {
                 () -> connectorService.sync(
                         connectionId,
                         request,
-                        institutionId
+                        institutionCaller
                 )
         );
 
@@ -506,7 +579,7 @@ class ConnectorServiceTest {
                 connectorService.sync(
                         connectionId,
                         request,
-                        institutionId
+                        institutionCaller
                 );
 
         assertEquals("COMPLETED", response.status());

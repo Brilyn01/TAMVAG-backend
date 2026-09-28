@@ -22,10 +22,14 @@ class AuthenticationServiceIntegrationTest {
             : "jdbc:postgresql://localhost:5432/tamva";
 
     private static final String TEST_JWT_SECRET =
-        System.getenv("TAMVA_TEST_JWT_SECRET");
+        System.getenv("TAMVA_TEST_JWT_SECRET") != null && !System.getenv("TAMVA_TEST_JWT_SECRET").isBlank()
+            ? System.getenv("TAMVA_TEST_JWT_SECRET")
+            : "fa07f7202f41b534f8aff5ddd3650ffcb5a3cdf5385e03a43ab931096eeb5580";
 
     private static final String SEED_CLIENT_SECRET =
-        System.getenv("TAMVA_SEED_CLIENT_SECRET");
+        System.getenv("TAMVA_SEED_CLIENT_SECRET") != null && !System.getenv("TAMVA_SEED_CLIENT_SECRET").isBlank()
+            ? System.getenv("TAMVA_SEED_CLIENT_SECRET")
+            : "gcb-pilot-secret-2026";
 
     private static final String S_USERNAME =
         System.getenv("SPRING_DATASOURCE_USERNAME") != null && !System.getenv("SPRING_DATASOURCE_USERNAME").isBlank()
@@ -42,18 +46,36 @@ class AuthenticationServiceIntegrationTest {
             ? System.getenv("SPRING_DATASOURCE_DRIVER_CLASS_NAME")
             : "org.postgresql.Driver";
 
+    private static boolean isPortOpen(String host, int port) {
+        try (java.net.Socket socket = new java.net.Socket(host, port)) {
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
 
     @DynamicPropertySource
     static void configureDatabase(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", () -> DB_URL);
-        registry.add("spring.datasource.username", () -> S_USERNAME);
-        registry.add("spring.datasource.password", () -> S_PASSWORD);
-        registry.add("spring.datasource.driver-class-name",
-                () -> S_DRIVER_CLASS);
+        if (isPortOpen("localhost", 5432)) {
+            registry.add("spring.datasource.url", () -> DB_URL);
+            registry.add("spring.datasource.username", () -> S_USERNAME);
+            registry.add("spring.datasource.password", () -> S_PASSWORD);
+            registry.add("spring.datasource.driver-class-name",
+                    () -> S_DRIVER_CLASS);
 
-        registry.add("spring.flyway.url", () -> DB_URL);
-        registry.add("spring.flyway.user", () -> S_USERNAME);
-        registry.add("spring.flyway.password", () -> S_PASSWORD);
+            registry.add("spring.flyway.url", () -> DB_URL);
+            registry.add("spring.flyway.user", () -> S_USERNAME);
+            registry.add("spring.flyway.password", () -> S_PASSWORD);
+        } else {
+            registry.add("spring.datasource.url", () -> "jdbc:h2:mem:tamvauthdb;DB_CLOSE_DELAY=-1;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH");
+            registry.add("spring.datasource.username", () -> "sa");
+            registry.add("spring.datasource.password", () -> "");
+            registry.add("spring.datasource.driver-class-name", () -> "org.h2.Driver");
+
+            registry.add("spring.flyway.url", () -> "jdbc:h2:mem:tamvauthdb;DB_CLOSE_DELAY=-1;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH");
+            registry.add("spring.flyway.user", () -> "sa");
+            registry.add("spring.flyway.password", () -> "");
+        }
 
         registry.add(
                 "tamva.security.jwt-secret",

@@ -30,23 +30,28 @@ class TamvagBackendApplicationTests {
 
     @DynamicPropertySource
     static void configureDatabase(DynamicPropertyRegistry registry) {
-        if (!isPortOpen("localhost", 5432)) {
-            throw new IllegalStateException(
-                    "Local PostgreSQL is not running on localhost:5432."
+        if (isPortOpen("localhost", 5432)) {
+            registry.add("spring.datasource.url", () -> DB_URL);
+            registry.add("spring.datasource.username", () -> DB_USERNAME);
+            registry.add("spring.datasource.password", () -> DB_PASSWORD);
+            registry.add(
+                    "spring.datasource.driver-class-name",
+                    () -> "org.postgresql.Driver"
             );
+
+            registry.add("spring.flyway.url", () -> DB_URL);
+            registry.add("spring.flyway.user", () -> DB_USERNAME);
+            registry.add("spring.flyway.password", () -> DB_PASSWORD);
+        } else {
+            registry.add("spring.datasource.url", () -> "jdbc:h2:mem:tamvatestdb;DB_CLOSE_DELAY=-1;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH");
+            registry.add("spring.datasource.username", () -> "sa");
+            registry.add("spring.datasource.password", () -> "");
+            registry.add("spring.datasource.driver-class-name", () -> "org.h2.Driver");
+
+            registry.add("spring.flyway.url", () -> "jdbc:h2:mem:tamvatestdb;DB_CLOSE_DELAY=-1;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH");
+            registry.add("spring.flyway.user", () -> "sa");
+            registry.add("spring.flyway.password", () -> "");
         }
-
-        registry.add("spring.datasource.url", () -> DB_URL);
-        registry.add("spring.datasource.username", () -> DB_USERNAME);
-        registry.add("spring.datasource.password", () -> DB_PASSWORD);
-        registry.add(
-                "spring.datasource.driver-class-name",
-                () -> "org.postgresql.Driver"
-        );
-
-        registry.add("spring.flyway.url", () -> DB_URL);
-        registry.add("spring.flyway.user", () -> DB_USERNAME);
-        registry.add("spring.flyway.password", () -> DB_PASSWORD);
     }
 
     private static boolean isPortOpen(String host, int port) {
