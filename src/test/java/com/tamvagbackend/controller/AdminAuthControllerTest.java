@@ -2,6 +2,7 @@ package com.tamvagbackend.controller;
 
 import com.tamvagbackend.config.SecurityConfig;
 import com.tamvagbackend.dto.AdminAuthDtos.AdminLoginResponse;
+import com.tamvagbackend.dto.AdminAuthDtos.AdminLogoutResponse;
 import com.tamvagbackend.dto.AdminAuthDtos.AdminUserInfo;
 import com.tamvagbackend.exception.GlobalExceptionHandler;
 import com.tamvagbackend.exception.SecurityExceptionHandler;
@@ -37,6 +38,8 @@ class AdminAuthControllerTest {
 
     @MockBean
     private AdminAuthenticationService adminAuthenticationService;
+
+    // ── Login Tests ──────────────────────────────────────────────────────
 
     @Test
     void validCredentialsReturnAdminToken() throws Exception {
@@ -84,4 +87,22 @@ class AdminAuthControllerTest {
         )
         .andExpect(status().isUnauthorized());
     }
+
+    // ── Logout Tests ─────────────────────────────────────────────────────
+
+    @Test
+    void logoutReturnsOk() throws Exception {
+        when(adminAuthenticationService.logout())
+                .thenReturn(new AdminLogoutResponse("Admin logged out successfully"));
+
+        mockMvc.perform(
+                post("/v1/admin/auth/logout")
+                        .contentType(MediaType.APPLICATION_JSON)
+        )
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.message").value("Admin logged out successfully"));
+    }
 }
+
+
+

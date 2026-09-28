@@ -45,5 +45,6 @@ replay_pid*.log
 
 ### Environment Secrets ###
 .env
-.env*.local
+.env*
 !.env.example
+generate_secrets.py

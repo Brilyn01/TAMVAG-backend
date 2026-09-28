@@ -1,0 +1,14 @@
+﻿# Production Profile (prod)
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+tamva:
+  seeder:
+    enabled: false
+
+logging:
+  level:
+    com.tamvagbackend: WARN
+    org.springframework: WARN

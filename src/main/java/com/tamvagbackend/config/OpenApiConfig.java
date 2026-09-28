@@ -8,6 +8,7 @@ import io.swagger.v3.oas.models.info.License;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
 import io.swagger.v3.oas.models.servers.Server;
+import org.springdoc.core.models.GroupedOpenApi;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -26,20 +27,9 @@ public class OpenApiConfig {
                         .description("""
                                 Engineering API specification for TAMVA.
 
-                                Use POST /v1/auth/token first to obtain a JWT.
+                                Use POST /v1/auth/token or POST /v1/users/signin first to obtain a JWT.
                                 In Swagger UI, click Authorize and paste only the
                                 access token; Swagger adds the Bearer prefix.
-
-                                Seeded pilot test data:
-                                GCB institution = 33333333-3333-3333-3333-333333333333
-                                Kwame customer = a1b2c3d4-0000-0000-0000-000000000001
-                                Abena customer = a1b2c3d4-0000-0000-0000-000000000002
-                                Pilot client ID = app_gcb_pilot_2026
-                                Pilot client secret = Configured the client secret through the deployment environment
-
-                                IDs generated at runtime, such as application_id,
-                                account_id, connection_id, case_id and passport_id,
-                                should be copied from the corresponding GET/POST response.
                                 """)
                         .version("1.0.0")
                         .contact(new Contact()
@@ -50,7 +40,7 @@ public class OpenApiConfig {
                 .servers(List.of(
                         new Server()
                                 .url("/")
-                                .description("Current Environment (Render / Local)")
+                                .description("Current Environment (Local / Staging / Production)")
                 ))
                 .components(new Components()
                         .addSecuritySchemes(
@@ -61,7 +51,7 @@ public class OpenApiConfig {
                                         .bearerFormat("JWT")
                                         .description(
                                                 "Paste the access_token returned by " +
-                                                "POST /v1/auth/token. Do not include 'Bearer '."
+                                                "POST /v1/auth/token or /v1/users/signin. Do not include 'Bearer '."
                                         )
                         ))
                 .addSecurityItem(
@@ -69,4 +59,44 @@ public class OpenApiConfig {
                                 .addList(BEARER_AUTH)
                 );
     }
-}
+
+    @Bean
+    public GroupedOpenApi allApiGroup() {
+        return GroupedOpenApi.builder()
+                .group("0-All-APIs")
+                .pathsToMatch("/v1/**", "/actuator/**")
+                .build();
+    }
+
+    @Bean
+    public GroupedOpenApi authApiGroup() {
+        return GroupedOpenApi.builder()
+                .group("1-Auth-APIs")
+                .pathsToMatch("/v1/auth/**", "/v1/admin/auth/**", "/v1/users/signup", "/v1/users/signin", "/v1/users/refresh", "/v1/users/logout")
+                .build();
+    }
+
+    @Bean
+    public GroupedOpenApi mobileApiGroup() {
+        return GroupedOpenApi.builder()
+                .group("2-Mobile-APIs")
+                .pathsToMatch("/v1/users/**", "/v1/wallets/**", "/v1/transfers/**")
+                .build();
+    }
+
+    @Bean
+    public GroupedOpenApi adminApiGroup() {
+        return GroupedOpenApi.builder()
+                .group("3-Admin-APIs")
+                .pathsToMatch("/v1/admin/**", "/v1/cases/**")
+                .build();
+    }
+
+    @Bean
+    public GroupedOpenApi webPartnerApiGroup() {
+        return GroupedOpenApi.builder()
+                .group("4-Web-Partner-APIs")
+                .pathsToMatch("/v1/risk/**", "/v1/consents/**", "/v1/connections/**", "/v1/institutions/**", "/v1/health")
+                .build();
+    }
+}

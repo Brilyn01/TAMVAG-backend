@@ -191,7 +191,7 @@ class LedgerServiceTest {
         );
         assertEquals("COMPLETED", persistedTransaction.getStatus());
 
-        verify(ledgerEntryRepository).save(any(LedgerEntry.class));
+        verify(ledgerEntryRepository, atLeastOnce()).save(any(LedgerEntry.class));
     }
 
     @Test
@@ -247,9 +247,9 @@ class LedgerServiceTest {
         ArgumentCaptor<LedgerEntry> entryCaptor =
                 ArgumentCaptor.forClass(LedgerEntry.class);
 
-        verify(ledgerEntryRepository).save(entryCaptor.capture());
+        verify(ledgerEntryRepository, times(2)).save(entryCaptor.capture());
 
-        LedgerEntry entry = entryCaptor.getValue();
+        LedgerEntry entry = entryCaptor.getAllValues().get(0);
 
         assertEquals(savedTransaction, entry.getTransaction());
         assertEquals("INCOME", entry.getEntryType());
@@ -316,9 +316,9 @@ class LedgerServiceTest {
         ArgumentCaptor<LedgerEntry> entryCaptor =
                 ArgumentCaptor.forClass(LedgerEntry.class);
 
-        verify(ledgerEntryRepository).save(entryCaptor.capture());
+        verify(ledgerEntryRepository, times(2)).save(entryCaptor.capture());
 
-        LedgerEntry entry = entryCaptor.getValue();
+        LedgerEntry entry = entryCaptor.getAllValues().get(0);
 
         assertEquals(savedTransaction, entry.getTransaction());
         assertEquals("FEE", entry.getEntryType());
@@ -592,7 +592,48 @@ class LedgerServiceTest {
         assertNotNull(result);
 
         verify(transactionRepository).save(any(Transaction.class));
-        verify(ledgerEntryRepository).save(any(LedgerEntry.class));
+        verify(ledgerEntryRepository, atLeastOnce()).save(any(LedgerEntry.class));
+    }
+
+    @Test
+    void reverseTransactionShouldCreateReversalTransactionAndBalancedEntries() {
+        UUID originalTxId = UUID.randomUUID();
+        Transaction originalTx = buildTransaction("TX-100", "IN", new BigDecimal("500.00"), "GHS", "DEPOSIT", "Salary", "GCB");
+        originalTx.setTransactionId(originalTxId);
+        originalTx.setStatus("COMPLETED");
+
+        when(transactionRepository.findById(originalTxId)).thenReturn(Optional.of(originalTx));
+        when(transactionRepository.save(any(Transaction.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(ledgerEntryRepository.save(any(LedgerEntry.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Transaction reversalResult = ledgerService.reverseTransaction(originalTxId, "Customer disputed charge");
+
+        assertNotNull(reversalResult);
+        assertEquals("OUT", reversalResult.getDirection());
+        assertEquals(new BigDecimal("500.00"), reversalResult.getAmount());
+        assertTrue(reversalResult.getReference().contains("REVERSAL: Customer disputed charge"));
+        assertEquals("REVERSED", originalTx.getStatus());
+
+        verify(transactionRepository, times(2)).save(any(Transaction.class));
+        verify(ledgerEntryRepository, times(2)).save(any(LedgerEntry.class));
+        verify(auditService).logEvent(eq("SYSTEM"), eq("system"), eq("TRANSACTION_REVERSED"), eq("TRANSACTION"), anyString(), any(), anyString());
+    }
+
+    @Test
+    void reverseTransactionShouldFailIfAlreadyReversed() {
+        UUID originalTxId = UUID.randomUUID();
+        Transaction originalTx = buildTransaction("TX-101", "IN", new BigDecimal("200.00"), "GHS", "DEPOSIT", "Deposit", "GCB");
+        originalTx.setTransactionId(originalTxId);
+        originalTx.setStatus("REVERSED");
+
+        when(transactionRepository.findById(originalTxId)).thenReturn(Optional.of(originalTx));
+
+        IllegalStateException exception = assertThrows(
+                IllegalStateException.class,
+                () -> ledgerService.reverseTransaction(originalTxId, "Duplicate attempt")
+        );
+
+        assertTrue(exception.getMessage().contains("already reversed"));
     }
 
     private Transaction buildTransaction(
