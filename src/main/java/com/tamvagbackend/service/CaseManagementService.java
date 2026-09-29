@@ -203,28 +203,53 @@ public class CaseManagementService {
 
     @Transactional
     public CaseResponse createManualCase(
-            com.tamvagbackend.dto.CaseDtos.CreateManualCaseRequest request,
-            UUID institutionId,
-            String authenticatedActor
+        com.tamvagbackend.dto.CaseDtos.CreateManualCaseRequest request,
+        UUID institutionId,
+        String authenticatedActor
     ) {
         requireAuthenticatedActor(authenticatedActor);
+
         if (request == null) {
-            throw new IllegalArgumentException("Create case request is required");
+                throw new IllegalArgumentException(
+                        "Create case request is required"
+                );
         }
 
+        requireInstitutionId(institutionId);
+
         CaseRecord record = new CaseRecord();
-        record.setInstitutionId(institutionId != null ? institutionId : UUID.fromString("11111111-1111-1111-1111-111111111111"));
-        record.setCaseType("MANUAL_INVESTIGATION");
+
+        record.setInstitutionId(institutionId);
+
+        // Must match V12 database constraint:
+        // case_type IN ('RISK_EVENT', 'MANUAL')
+        record.setCaseType("MANUAL");
+
         record.setSource("MANUAL");
         record.setTitle(request.title());
         record.setDescription(request.description());
-        record.setSeverity(request.severity() != null ? normalize(request.severity()) : "MEDIUM");
-        record.setPriority(request.priority() != null ? normalize(request.priority()) : "NORMAL");
+        record.setSeverity(
+                request.severity() != null
+                        ? normalize(request.severity())
+                        : "MEDIUM"
+        );
+        record.setPriority(
+                request.priority() != null
+                        ? normalize(request.priority())
+                        : "NORMAL"
+        );
         record.setStatus("OPEN");
         record.setCustomerId(request.customerId());
         record.setCreatedBy(authenticatedActor);
 
-        CaseRecord saved = caseRecordRepository.save(record);
+        /*
+        * Force the INSERT to execute before recording CASE_CREATED.
+        *
+        * If PostgreSQL rejects the row (for example, because of a
+        * constraint violation), this throws and the audit event below
+        * is never recorded.
+        */
+        CaseRecord saved = caseRecordRepository.saveAndFlush(record);
 
         auditService.logEvent(
                 "ADMIN",
