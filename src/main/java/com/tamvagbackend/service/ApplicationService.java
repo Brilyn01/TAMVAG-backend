@@ -8,6 +8,7 @@ import com.tamvagbackend.domain.entity.Institution;
 import com.tamvagbackend.domain.repository.ApplicationRepository;
 import com.tamvagbackend.domain.repository.InstitutionRepository;
 import com.tamvagbackend.dto.ApplicationDtos;
+import com.tamvagbackend.security.CallerContext;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -51,13 +52,15 @@ public class ApplicationService {
 
     public ApplicationDtos.CreateApplicationResponse create(
             ApplicationDtos.CreateApplicationRequest request,
-            UUID callerInstitutionId
+            CallerContext callerContext
     ) {
-        if (!callerInstitutionId.equals(request.institutionId())) {
-            throw new ResponseStatusException(
-                    HttpStatus.FORBIDDEN,
-                    "Cannot create an application for another institution"
-            );
+        if (callerContext instanceof CallerContext.InstitutionCaller instCaller) {
+            if (!instCaller.institutionId().equals(request.institutionId())) {
+                throw new ResponseStatusException(
+                        HttpStatus.FORBIDDEN,
+                        "Cannot create an application for another institution"
+                );
+            }
         }
 
         Institution institution = institutionRepository
@@ -98,11 +101,11 @@ public class ApplicationService {
     @Transactional(readOnly = true)
     public ApplicationDtos.ApplicationResponse get(
             UUID applicationId,
-            UUID callerInstitutionId
+            CallerContext callerContext
     ) {
         Application application = findApplication(
                 applicationId,
-                callerInstitutionId
+                callerContext
         );
 
         return toResponse(application);
@@ -110,10 +113,18 @@ public class ApplicationService {
 
     @Transactional(readOnly = true)
     public List<ApplicationDtos.ApplicationResponse> list(
-            UUID callerInstitutionId
+            CallerContext callerContext
     ) {
+        if (callerContext instanceof CallerContext.InstitutionCaller instCaller) {
+            return applicationRepository
+                    .findByInstitution_InstitutionId(instCaller.institutionId())
+                    .stream()
+                    .map(this::toResponse)
+                    .toList();
+        }
+
         return applicationRepository
-                .findByInstitution_InstitutionId(callerInstitutionId)
+                .findAll()
                 .stream()
                 .map(this::toResponse)
                 .toList();
@@ -121,12 +132,12 @@ public class ApplicationService {
 
     public ApplicationDtos.ApplicationResponse updateStatus(
             UUID applicationId,
-            UUID callerInstitutionId,
+            CallerContext callerContext,
             ApplicationDtos.UpdateStatusRequest request
     ) {
         Application application = findApplication(
                 applicationId,
-                callerInstitutionId
+                callerContext
         );
 
         String status = request.status()
@@ -149,12 +160,12 @@ public class ApplicationService {
 
     public ApplicationDtos.ApplicationResponse updateScopes(
             UUID applicationId,
-            UUID callerInstitutionId,
+            CallerContext callerContext,
             ApplicationDtos.UpdateScopesRequest request
     ) {
         Application application = findApplication(
                 applicationId,
-                callerInstitutionId
+                callerContext
         );
 
         List<String> scopes = validateApplicationScopes(
@@ -172,11 +183,11 @@ public class ApplicationService {
 
     public ApplicationDtos.RotateSecretResponse rotateSecret(
             UUID applicationId,
-            UUID callerInstitutionId
+            CallerContext callerContext
     ) {
         Application application = findApplication(
                 applicationId,
-                callerInstitutionId
+                callerContext
         );
 
         String clientSecret = generateClientSecret();
@@ -196,18 +207,27 @@ public class ApplicationService {
 
     private Application findApplication(
             UUID applicationId,
-            UUID callerInstitutionId
+            CallerContext callerContext
     ) {
-        /*
-         * Return 404 rather than 403 on a cross-institution ID
-         * so callers cannot use this endpoint to enumerate
-         * whether an application ID exists under another institution.
-         */
+        if (callerContext instanceof CallerContext.InstitutionCaller instCaller) {
+            /*
+             * Return 404 rather than 403 on a cross-institution ID
+             * so callers cannot use this endpoint to enumerate
+             * whether an application ID exists under another institution.
+             */
+            return applicationRepository
+                    .findByApplicationIdAndInstitution_InstitutionId(
+                            applicationId,
+                            instCaller.institutionId()
+                    )
+                    .orElseThrow(() -> new ResponseStatusException(
+                            HttpStatus.NOT_FOUND,
+                            "Application not found: " + applicationId
+                    ));
+        }
+
         return applicationRepository
-                .findByApplicationIdAndInstitution_InstitutionId(
-                        applicationId,
-                        callerInstitutionId
-                )
+                .findById(applicationId)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND,
                         "Application not found: " + applicationId

@@ -3,6 +3,7 @@ package com.tamvagbackend.controller;
 import com.tamvagbackend.dto.AuditDtos.ConnectorSyncRequest;
 import com.tamvagbackend.dto.AuditDtos.ConnectorSyncResponse;
 import com.tamvagbackend.dto.AuditDtos.ConnectionResponse;
+import com.tamvagbackend.security.CallerContext;
 import com.tamvagbackend.service.ConnectorService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -13,6 +14,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -35,15 +37,11 @@ public class ConnectorController {
         summary = "List connector connections",
         description = "Lists customer financial connections belonging to the authenticated institution"
     )
-        public ResponseEntity<java.util.List<ConnectionResponse>> getConnections(
-                @AuthenticationPrincipal Jwt jwt
-        ) {
-        UUID institutionId = UUID.fromString(
-                jwt.getClaimAsString("institution_id")
-        );
-
+    public ResponseEntity<List<ConnectionResponse>> getConnections(
+            @AuthenticationPrincipal Jwt jwt
+    ) {
         return ResponseEntity.ok(
-                connectorService.getConnections(institutionId)
+                connectorService.getConnections(CallerContext.from(jwt))
         );
     }
 
@@ -58,15 +56,11 @@ public class ConnectorController {
             @Valid @RequestBody ConnectorSyncRequest request,
             @AuthenticationPrincipal Jwt jwt
     ) {
-        UUID institutionId = UUID.fromString(
-                jwt.getClaimAsString("institution_id")
-        );
-
         return ResponseEntity.ok(
                 connectorService.sync(
                         connectionId,
                         request,
-                        institutionId
+                        CallerContext.from(jwt)
                 )
         );
     }

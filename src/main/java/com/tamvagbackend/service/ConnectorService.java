@@ -49,11 +49,16 @@ public class ConnectorService {
 
     @Transactional(readOnly = true)
     public List<ConnectionResponse> getConnections(
-        UUID authenticatedInstitutionId
+        com.tamvagbackend.security.CallerContext callerContext
     ) {
-        return connectionRepository
-                .findByInstitution_InstitutionId(authenticatedInstitutionId)
-                .stream()
+        List<Connection> connections;
+        if (callerContext instanceof com.tamvagbackend.security.CallerContext.InstitutionCaller instCaller) {
+            connections = connectionRepository.findByInstitution_InstitutionId(instCaller.institutionId());
+        } else {
+            connections = connectionRepository.findAll();
+        }
+
+        return connections.stream()
                 .map(connection -> new ConnectionResponse(
                         connection.getConnectionId(),
                         connection.getCustomer().getCustomerId(),
@@ -64,13 +69,13 @@ public class ConnectorService {
                         connection.getCreatedAt()
                 ))
                 .toList();
-        }
+    }
 
     @Transactional
     public ConnectorSyncResponse sync(
             UUID connectionId,
             ConnectorSyncRequest request,
-            UUID authenticatedInstitutionId
+            com.tamvagbackend.security.CallerContext callerContext
     ) {
         if (request.customerId() == null || request.institutionId() == null) {
             throw new ResponseStatusException(
@@ -79,11 +84,13 @@ public class ConnectorService {
             );
         }
 
-        if (!authenticatedInstitutionId.equals(request.institutionId())) {
-            throw new ResponseStatusException(
-                    HttpStatus.FORBIDDEN,
-                    "Institution does not match authenticated application"
-            );
+        if (callerContext instanceof com.tamvagbackend.security.CallerContext.InstitutionCaller instCaller) {
+            if (!instCaller.institutionId().equals(request.institutionId())) {
+                throw new ResponseStatusException(
+                        HttpStatus.FORBIDDEN,
+                        "Institution does not match authenticated application"
+                );
+            }
         }
 
         Connection connection = connectionRepository
@@ -227,9 +234,24 @@ public class ConnectorService {
 
         String syncId = UUID.randomUUID().toString();
 
+        String actorType;
+        String actorId;
+        if (callerContext instanceof com.tamvagbackend.security.CallerContext.AdminCaller adminCaller) {
+            actorType = "ADMIN";
+            actorId = adminCaller.adminUserId() != null
+                    ? adminCaller.adminUserId().toString()
+                    : (adminCaller.email() != null ? adminCaller.email() : "admin");
+        } else if (callerContext instanceof com.tamvagbackend.security.CallerContext.InstitutionCaller instCaller) {
+            actorType = "APPLICATION";
+            actorId = instCaller.institutionId().toString();
+        } else {
+            actorType = "SYSTEM";
+            actorId = "system";
+        }
+
         auditService.logEvent(
-                "APPLICATION",
-                authenticatedInstitutionId.toString(),
+                actorType,
+                actorId,
                 "CONNECTOR_SYNC",
                 "CONNECTION",
                 connectionId.toString(),
@@ -238,6 +260,8 @@ public class ConnectorService {
                         + syncMode
                         + " mode; provider="
                         + providerCode
+                        + ", institution="
+                        + request.institutionId()
                         + ", ingested="
                         + recordsIngested
                         + ", normalized="

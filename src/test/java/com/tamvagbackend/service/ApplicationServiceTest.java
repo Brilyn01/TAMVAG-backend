@@ -6,6 +6,7 @@ import com.tamvagbackend.domain.entity.Institution;
 import com.tamvagbackend.domain.repository.ApplicationRepository;
 import com.tamvagbackend.domain.repository.InstitutionRepository;
 import com.tamvagbackend.dto.ApplicationDtos;
+import com.tamvagbackend.security.CallerContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -13,6 +14,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Optional;
@@ -42,6 +44,8 @@ class ApplicationServiceTest {
     private Institution institution;
 
     private Application savedApplication;
+    private CallerContext.InstitutionCaller institutionCaller;
+    private CallerContext.AdminCaller adminCaller;
 
     @BeforeEach
     void setUp() {
@@ -53,6 +57,9 @@ class ApplicationServiceTest {
         institution = new Institution();
         institution.setInstitutionId(institutionId);
 
+        institutionCaller = new CallerContext.InstitutionCaller(institutionId, applicationId);
+        adminCaller = new CallerContext.AdminCaller(UUID.randomUUID(), "admin@tamva.com", "SUPER_ADMIN", "SECURITY_ADMIN");
+
         applicationService = new ApplicationService(
                 applicationRepository,
                 institutionRepository,
@@ -62,7 +69,7 @@ class ApplicationServiceTest {
     }
 
     @Test
-    void createGeneratesClientCredentialsAndStoresOnlyHash() {
+    void createGeneratesClientCredentialsAndStoresOnlyHashForInstitutionCaller() {
         ApplicationDtos.CreateApplicationRequest request =
                 new ApplicationDtos.CreateApplicationRequest(
                         institutionId,
@@ -78,14 +85,14 @@ class ApplicationServiceTest {
 
         when(applicationRepository.save(any(Application.class)))
                 .thenAnswer(invocation -> {
-                Application application = invocation.getArgument(0);
-                application.setApplicationId(applicationId);
-                savedApplication = application;
-                return application;
+                    Application application = invocation.getArgument(0);
+                    application.setApplicationId(applicationId);
+                    savedApplication = application;
+                    return application;
                 });
 
         ApplicationDtos.CreateApplicationResponse response =
-                applicationService.create(request, institutionId);
+                applicationService.create(request, institutionCaller);
 
         assertNotNull(response);
         assertNotNull(response.clientSecret());
@@ -100,7 +107,6 @@ class ApplicationServiceTest {
         verify(applicationRepository).save(any(Application.class));
 
         assertNotNull(savedApplication);
-
         assertNotNull(savedApplication.getClientSecretHash());
         assertNotEquals(
                 response.clientSecret(),
@@ -113,6 +119,54 @@ class ApplicationServiceTest {
                         savedApplication.getClientSecretHash()
                 )
         );
+    }
+
+    @Test
+    void createAllowsAdminCallerForAnyValidInstitution() {
+        ApplicationDtos.CreateApplicationRequest request =
+                new ApplicationDtos.CreateApplicationRequest(
+                        institutionId,
+                        "Admin Created Partner",
+                        List.of("risk:evaluate", "profile:read")
+                );
+
+        when(institutionRepository.findById(institutionId))
+                .thenReturn(Optional.of(institution));
+
+        when(applicationRepository.findByClientId(anyString()))
+                .thenReturn(Optional.empty());
+
+        when(applicationRepository.save(any(Application.class)))
+                .thenAnswer(invocation -> {
+                    Application application = invocation.getArgument(0);
+                    application.setApplicationId(applicationId);
+                    return application;
+                });
+
+        ApplicationDtos.CreateApplicationResponse response =
+                applicationService.create(request, adminCaller);
+
+        assertNotNull(response);
+        assertEquals("Admin Created Partner", response.application().name());
+        assertEquals(institutionId, response.application().institutionId());
+    }
+
+    @Test
+    void createRejectsCrossInstitutionForInstitutionCaller() {
+        UUID otherInstitutionId = UUID.randomUUID();
+        ApplicationDtos.CreateApplicationRequest request =
+                new ApplicationDtos.CreateApplicationRequest(
+                        otherInstitutionId,
+                        "Cross Institution Partner",
+                        List.of("risk:evaluate")
+                );
+
+        assertThrows(
+                ResponseStatusException.class,
+                () -> applicationService.create(request, institutionCaller)
+        );
+
+        verify(applicationRepository, never()).save(any(Application.class));
     }
 
     @Test
@@ -129,11 +183,55 @@ class ApplicationServiceTest {
 
         assertThrows(
                 Exception.class,
-                () -> applicationService.create(request, institutionId)
+                () -> applicationService.create(request, institutionCaller)
         );
 
         verify(applicationRepository, never())
                 .save(any(Application.class));
+    }
+
+    @Test
+    void listReturnsOnlyInstitutionApplicationsForInstitutionCaller() {
+        Application app = existingApplication();
+        when(applicationRepository.findByInstitution_InstitutionId(institutionId))
+                .thenReturn(List.of(app));
+
+        List<ApplicationDtos.ApplicationResponse> result =
+                applicationService.list(institutionCaller);
+
+        assertEquals(1, result.size());
+        assertEquals(applicationId, result.get(0).applicationId());
+        verify(applicationRepository).findByInstitution_InstitutionId(institutionId);
+        verify(applicationRepository, never()).findAll();
+    }
+
+    @Test
+    void listReturnsAllApplicationsForAdminCaller() {
+        Application app = existingApplication();
+        when(applicationRepository.findAll())
+                .thenReturn(List.of(app));
+
+        List<ApplicationDtos.ApplicationResponse> result =
+                applicationService.list(adminCaller);
+
+        assertEquals(1, result.size());
+        assertEquals(applicationId, result.get(0).applicationId());
+        verify(applicationRepository).findAll();
+        verify(applicationRepository, never()).findByInstitution_InstitutionId(any());
+    }
+
+    @Test
+    void getRetrievesApplicationForAdminCallerById() {
+        Application application = existingApplication();
+        when(applicationRepository.findById(applicationId))
+                .thenReturn(Optional.of(application));
+
+        ApplicationDtos.ApplicationResponse response =
+                applicationService.get(applicationId, adminCaller);
+
+        assertNotNull(response);
+        assertEquals(applicationId, response.applicationId());
+        verify(applicationRepository).findById(applicationId);
     }
 
     @Test
@@ -149,7 +247,7 @@ class ApplicationServiceTest {
         ApplicationDtos.ApplicationResponse response =
                 applicationService.updateStatus(
                         applicationId,
-                        institutionId,
+                        institutionCaller,
                         new ApplicationDtos.UpdateStatusRequest("INACTIVE")
                 );
 
@@ -157,7 +255,7 @@ class ApplicationServiceTest {
 
         response = applicationService.updateStatus(
                 applicationId,
-                institutionId,
+                institutionCaller,
                 new ApplicationDtos.UpdateStatusRequest("ACTIVE")
         );
 
@@ -175,7 +273,7 @@ class ApplicationServiceTest {
                 Exception.class,
                 () -> applicationService.updateStatus(
                         applicationId,
-                        institutionId,
+                        institutionCaller,
                         new ApplicationDtos.UpdateStatusRequest("DELETED")
                 )
         );
@@ -197,7 +295,7 @@ class ApplicationServiceTest {
         ApplicationDtos.ApplicationResponse response =
                 applicationService.updateScopes(
                         applicationId,
-                        institutionId,
+                        institutionCaller,
                         new ApplicationDtos.UpdateScopesRequest(
                                 List.of(
                                         "risk:evaluate",
@@ -239,7 +337,7 @@ class ApplicationServiceTest {
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
         ApplicationDtos.RotateSecretResponse response =
-                applicationService.rotateSecret(applicationId, institutionId);
+                applicationService.rotateSecret(applicationId, institutionCaller);
 
         assertNotNull(response.clientSecret());
         assertFalse(response.clientSecret().isBlank());

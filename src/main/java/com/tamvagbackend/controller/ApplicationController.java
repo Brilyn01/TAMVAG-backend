@@ -1,6 +1,7 @@
 package com.tamvagbackend.controller;
 
 import com.tamvagbackend.dto.ApplicationDtos;
+import com.tamvagbackend.security.CallerContext;
 import com.tamvagbackend.service.ApplicationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -38,7 +39,7 @@ public class ApplicationController {
     ) {
         return ResponseEntity
                 .status(HttpStatus.CREATED)
-                .body(applicationService.create(request, institutionId(jwt)));
+                .body(applicationService.create(request, CallerContext.from(jwt)));
     }
 
     @GetMapping
@@ -47,7 +48,7 @@ public class ApplicationController {
     public ResponseEntity<List<ApplicationDtos.ApplicationResponse>> list(
             @AuthenticationPrincipal Jwt jwt
     ) {
-        return ResponseEntity.ok(applicationService.list(institutionId(jwt)));
+        return ResponseEntity.ok(applicationService.list(CallerContext.from(jwt)));
     }
 
     @GetMapping("/{applicationId}")
@@ -58,7 +59,7 @@ public class ApplicationController {
             @AuthenticationPrincipal Jwt jwt
     ) {
         return ResponseEntity.ok(
-                applicationService.get(applicationId, institutionId(jwt))
+                applicationService.get(applicationId, CallerContext.from(jwt))
         );
     }
 
@@ -71,7 +72,7 @@ public class ApplicationController {
             @AuthenticationPrincipal Jwt jwt
     ) {
         return ResponseEntity.ok(
-                applicationService.updateStatus(applicationId, institutionId(jwt), request)
+                applicationService.updateStatus(applicationId, CallerContext.from(jwt), request)
         );
     }
 
@@ -84,7 +85,7 @@ public class ApplicationController {
             @AuthenticationPrincipal Jwt jwt
     ) {
         return ResponseEntity.ok(
-                applicationService.updateScopes(applicationId, institutionId(jwt), request)
+                applicationService.updateScopes(applicationId, CallerContext.from(jwt), request)
         );
     }
 
@@ -96,11 +97,7 @@ public class ApplicationController {
             @AuthenticationPrincipal Jwt jwt
     ) {
         return ResponseEntity.ok(
-                applicationService.rotateSecret(applicationId, institutionId(jwt))
+                applicationService.rotateSecret(applicationId, CallerContext.from(jwt))
         );
-    }
-
-    private UUID institutionId(Jwt jwt) {
-        return UUID.fromString(jwt.getClaimAsString("institution_id"));
     }
 }
