@@ -17,34 +17,22 @@ import static org.junit.jupiter.api.Assertions.*;
 class AuthenticationServiceIntegrationTest {
 
     private static final String DB_URL =
-        System.getenv("TAMVA_DB_URL") != null && !System.getenv("TAMVA_DB_URL").isBlank()
-            ? System.getenv("TAMVA_DB_URL")
-            : "jdbc:postgresql://localhost:5432/tamva";
+        System.getenv("TAMVA_DB_URL");
 
     private static final String TEST_JWT_SECRET =
-        System.getenv("TAMVA_TEST_JWT_SECRET") != null && !System.getenv("TAMVA_TEST_JWT_SECRET").isBlank()
-            ? System.getenv("TAMVA_TEST_JWT_SECRET")
-            : "fa07f7202f41b534f8aff5ddd3650ffcb5a3cdf5385e03a43ab931096eeb5580";
+        System.getenv("TAMVA_TEST_JWT_SECRET");
 
     private static final String SEED_CLIENT_SECRET =
-        System.getenv("TAMVA_SEED_CLIENT_SECRET") != null && !System.getenv("TAMVA_SEED_CLIENT_SECRET").isBlank()
-            ? System.getenv("TAMVA_SEED_CLIENT_SECRET")
-            : "gcb-pilot-secret-2026";
+        System.getenv("TAMVA_SEED_CLIENT_SECRET"); 
 
     private static final String S_USERNAME =
-        System.getenv("SPRING_DATASOURCE_USERNAME") != null && !System.getenv("SPRING_DATASOURCE_USERNAME").isBlank()
-            ? System.getenv("SPRING_DATASOURCE_USERNAME")
-            : "tamva_user";
+        System.getenv("SPRING_DATASOURCE_USERNAME");
 
     private static final String S_PASSWORD =
-        System.getenv("SPRING_DATASOURCE_PASSWORD") != null && !System.getenv("SPRING_DATASOURCE_PASSWORD").isBlank()
-            ? System.getenv("SPRING_DATASOURCE_PASSWORD")
-            : "tamva_pass";
+        System.getenv("SPRING_DATASOURCE_PASSWORD");
 
     private static final String S_DRIVER_CLASS =
-        System.getenv("SPRING_DATASOURCE_DRIVER_CLASS_NAME") != null && !System.getenv("SPRING_DATASOURCE_DRIVER_CLASS_NAME").isBlank()
-            ? System.getenv("SPRING_DATASOURCE_DRIVER_CLASS_NAME")
-            : "org.postgresql.Driver";
+        System.getenv("SPRING_DATASOURCE_DRIVER_CLASS_NAME");
 
     private static boolean isPortOpen(String host, int port) {
         try (java.net.Socket socket = new java.net.Socket(host, port)) {

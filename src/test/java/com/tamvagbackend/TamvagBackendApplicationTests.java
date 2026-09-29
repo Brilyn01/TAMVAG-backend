@@ -13,19 +13,13 @@ import java.net.Socket;
 class TamvagBackendApplicationTests {
 
     private static final String DB_URL =
-            System.getenv("SPRING_DATASOURCE_URL") != null && !System.getenv("SPRING_DATASOURCE_URL").isBlank()
-                    ? System.getenv("SPRING_DATASOURCE_URL")
-                    : "jdbc:postgresql://localhost:5432/tamva";
+            System.getenv("SPRING_DATASOURCE_URL");
 
     private static final String DB_USERNAME =
-            System.getenv("SPRING_DATASOURCE_USERNAME") != null && !System.getenv("SPRING_DATASOURCE_USERNAME").isBlank()
-                    ? System.getenv("SPRING_DATASOURCE_USERNAME")
-                    : "tamva_user";
+            System.getenv("SPRING_DATASOURCE_USERNAME");
 
     private static final String DB_PASSWORD =
-            System.getenv("SPRING_DATASOURCE_PASSWORD") != null && !System.getenv("SPRING_DATASOURCE_PASSWORD").isBlank()
-                    ? System.getenv("SPRING_DATASOURCE_PASSWORD")
-                    : "tamva_pass";
+            System.getenv("SPRING_DATASOURCE_PASSWORD");
 
 
     @DynamicPropertySource
