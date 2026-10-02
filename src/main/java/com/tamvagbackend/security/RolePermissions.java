@@ -28,15 +28,40 @@ public final class RolePermissions {
     public static final String CASES_CREATE = "cases:create";
     public static final String CASES_ASSIGN = "cases:assign";
     public static final String CASES_CLOSE = "cases:close";
+
     public static final String PROFILE_READ = "profile:read";
+
     public static final String RISK_EVALUATE = "risk:evaluate";
+
     public static final String APPLICATION_READ = "application:read";
     public static final String APPLICATION_MANAGE = "application:manage";
+
     public static final String CONNECTOR_READ = "connector:read";
     public static final String CONNECTOR_SYNC = "connector:sync";
+
     public static final String AUDIT_READ = "audit:read";
+
     public static final String ADMIN_PROVISION = "admin:provision";
     public static final String ADMIN_MANAGE = "admin:manage";
+
+    /*
+     * Wallet permissions.
+     *
+     * These permissions are intentionally defined here first.
+     * They should only be granted to roles that are explicitly
+     * authorized to operate on wallet resources.
+     */
+    public static final String WALLET_READ = "wallet:read";
+    public static final String WALLET_WRITE = "wallet:write";
+
+    /*
+     * Webhook permissions.
+     *
+     * These permissions control webhook resource operations.
+     * Resource ownership must still be enforced by the service layer.
+     */
+    public static final String WEBHOOK_READ = "webhook:read";
+    public static final String WEBHOOK_MANAGE = "webhook:manage";
 
     /*
      * Normalize a role supplied by a trusted identity source.
@@ -84,38 +109,86 @@ public final class RolePermissions {
     }
 
     /*
-     * Compute explicit permissions for an administrative user.
+     * Specify explicit permissions for an administrative user.
      */
-    public static Set<String> getPermissionsForAdmin(String role, String operationalRole) {
+    public static Set<String> getPermissionsForAdmin(
+            String role,
+            String operationalRole
+    ) {
         Set<String> permissions = new HashSet<>();
 
-        String normRole = role != null ? normalizeRole(role) : ADMIN;
-        String normOpRole = operationalRole != null && !operationalRole.isBlank()
-                ? normalizeRole(operationalRole)
-                : null;
+        String normRole = role != null
+                ? normalizeRole(role)
+                : ADMIN;
+
+        String normOpRole =
+                operationalRole != null && !operationalRole.isBlank()
+                        ? normalizeRole(operationalRole)
+                        : null;
 
         if (SUPER_ADMIN.equals(normRole)) {
             permissions.addAll(Set.of(
-                    CASES_READ, CASES_WRITE, CASES_CREATE, CASES_ASSIGN, CASES_CLOSE,
-                    PROFILE_READ, RISK_EVALUATE,
-                    APPLICATION_READ, APPLICATION_MANAGE,
-                    CONNECTOR_READ, CONNECTOR_SYNC,
-                    AUDIT_READ, ADMIN_PROVISION, ADMIN_MANAGE
+                    CASES_READ,
+                    CASES_WRITE,
+                    CASES_CREATE,
+                    CASES_ASSIGN,
+                    CASES_CLOSE,
+
+                    PROFILE_READ,
+                    RISK_EVALUATE,
+
+                    APPLICATION_READ,
+                    APPLICATION_MANAGE,
+
+                    CONNECTOR_READ,
+                    CONNECTOR_SYNC,
+
+                    AUDIT_READ,
+
+                    ADMIN_PROVISION,
+                    ADMIN_MANAGE,
+
+                    WALLET_READ,
+                    WALLET_WRITE,
+
+                    WEBHOOK_READ,
+                    WEBHOOK_MANAGE
             ));
+
             return Collections.unmodifiableSet(permissions);
         }
 
         if (normOpRole != null) {
             switch (normOpRole) {
+
                 case RISK_ANALYST -> permissions.addAll(Set.of(
-                        CASES_READ, CASES_WRITE, PROFILE_READ, RISK_EVALUATE, AUDIT_READ
+                        CASES_READ,
+                        CASES_WRITE,
+                        PROFILE_READ,
+                        RISK_EVALUATE,
+                        AUDIT_READ
                 ));
+
                 case SECURITY_ADMINISTRATOR -> permissions.addAll(Set.of(
-                        CASES_READ, CASES_WRITE, CASES_CREATE, CASES_ASSIGN, CASES_CLOSE, AUDIT_READ
+                        CASES_READ,
+                        CASES_WRITE,
+                        CASES_CREATE,
+                        CASES_ASSIGN,
+                        CASES_CLOSE,
+                        AUDIT_READ
                 ));
+
                 case PLATFORM_OPERATOR -> permissions.addAll(Set.of(
-                        APPLICATION_READ, APPLICATION_MANAGE, CONNECTOR_READ, CONNECTOR_SYNC, AUDIT_READ
+                        APPLICATION_READ,
+                        APPLICATION_MANAGE,
+                        CONNECTOR_READ,
+                        CONNECTOR_SYNC,
+                        AUDIT_READ
                 ));
+
+                default -> {
+                    // No additional permissions.
+                }
             }
         }
 
