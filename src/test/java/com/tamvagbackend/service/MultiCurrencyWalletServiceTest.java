@@ -88,7 +88,11 @@ class MultiCurrencyWalletServiceTest {
                 .thenReturn(Optional.of(existingTransfer));
 
         CurrencyTransferRequest req = new CurrencyTransferRequest(customerId, "GHS", "USD", new BigDecimal("100.00"), "TXF_DUP_001");
-        CurrencyTransferResponse response = walletService.executeTransfer(req);
+        CurrencyTransferResponse response =
+            walletService.executeTransfer(
+                    req,
+                    customerId
+            );
 
         assertNotNull(response);
         assertEquals("TXF_DUP_001", response.reference());
