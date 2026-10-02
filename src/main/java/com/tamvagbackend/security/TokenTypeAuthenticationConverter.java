@@ -122,6 +122,12 @@ public class TokenTypeAuthenticationConverter
                 "user_id",
                 "User token requires user_id"
         );
+
+        requireClaim(
+                jwt,
+                "customer_id",
+                "User token requires customer_id"
+        );
     }
 
     private void requireClaim(
